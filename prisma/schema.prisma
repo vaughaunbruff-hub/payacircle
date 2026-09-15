@@ -1,12 +1,57 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
 
-enum Role { USER ADMIN }
-enum CircleType { FAMILY FRIENDS SOCIAL_MEDIA CUSTOM }
-enum CircleStatus { COLLECTING READY PAYOUT_PENDING COMPLETED PAUSED }
-enum MembershipStatus { RESERVED PAYMENT_PENDING PAID PAYOUT_SCHEDULED PAID_OUT CANCELLED REFUNDED }
-enum PaymentStatus { CREATED APPROVED CAPTURED FAILED REFUNDED }
-enum PayoutStatus { SCHEDULED PROCESSING COMPLETED FAILED RETURNED }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum CircleType {
+  FAMILY
+  FRIENDS
+  SOCIAL_MEDIA
+  CUSTOM
+}
+
+enum CircleStatus {
+  COLLECTING
+  READY
+  PAYOUT_PENDING
+  COMPLETED
+  PAUSED
+}
+
+enum MembershipStatus {
+  RESERVED
+  PAYMENT_PENDING
+  PAID
+  PAYOUT_SCHEDULED
+  PAID_OUT
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  CREATED
+  APPROVED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum PayoutStatus {
+  SCHEDULED
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETURNED
+}
 
 model User {
   id String @id @default(cuid())
