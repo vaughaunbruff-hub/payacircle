@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/server.js",
-    "start": "node src/server.js",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed": "node prisma/seed.js"
+  "dev": "node --watch src/server.js",
+  "start": "node src/server.js",
+  "postinstall": "prisma generate",
+  "db:generate": "prisma generate",
+  "db:push": "prisma db push",
+  "db:seed": "node prisma/seed.js"
+}
   },
   "dependencies": {
     "@prisma/client": "latest",
