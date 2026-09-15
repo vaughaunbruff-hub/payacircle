@@ -12,7 +12,7 @@
     "db:seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "@prisma/client": "latest",
+    "@prisma/client": "^5.20.0",
     "bcryptjs": "latest",
     "cookie-parser": "latest",
     "dotenv": "latest",
@@ -23,7 +23,7 @@
     "zod": "latest"
   },
   "devDependencies": {
-    "prisma": "latest"
+    "prisma": "^5.20.0"
   },
   "engines": {
     "node": ">=20"
