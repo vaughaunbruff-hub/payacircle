@@ -82,6 +82,7 @@ model Circle {
   memberships Membership[]
   payoutDates PayoutDate[]
   payments Payment[]
+  payouts Payout[]
 }
 
 model PayoutDate {
