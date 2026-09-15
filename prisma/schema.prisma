@@ -1,0 +1,113 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+enum Role { USER ADMIN }
+enum CircleType { FAMILY FRIENDS SOCIAL_MEDIA CUSTOM }
+enum CircleStatus { COLLECTING READY PAYOUT_PENDING COMPLETED PAUSED }
+enum MembershipStatus { RESERVED PAYMENT_PENDING PAID PAYOUT_SCHEDULED PAID_OUT CANCELLED REFUNDED }
+enum PaymentStatus { CREATED APPROVED CAPTURED FAILED REFUNDED }
+enum PayoutStatus { SCHEDULED PROCESSING COMPLETED FAILED RETURNED }
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  passwordHash String
+  name String
+  paypalEmail String?
+  emailVerifiedAt DateTime?
+  role Role @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  memberships Membership[]
+  payments Payment[]
+  payouts Payout[]
+}
+
+model Circle {
+  id String @id @default(cuid())
+  code String @unique
+  name String?
+  type CircleType @default(CUSTOM)
+  amountCents Int
+  capacity Int
+  houseFeeCents Int @default(10000)
+  status CircleStatus @default(COLLECTING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  memberships Membership[]
+  payoutDates PayoutDate[]
+  payments Payment[]
+}
+
+model PayoutDate {
+  id String @id @default(cuid())
+  circleId String
+  payoutAt DateTime
+  capacity Int @default(1)
+  reserved Int @default(0)
+  circle Circle @relation(fields:[circleId], references:[id])
+  memberships Membership[]
+  payouts Payout[]
+  @@unique([circleId,payoutAt])
+}
+
+model Membership {
+  id String @id @default(cuid())
+  userId String
+  circleId String
+  payoutDateId String
+  status MembershipStatus @default(RESERVED)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId], references:[id])
+  circle Circle @relation(fields:[circleId], references:[id])
+  payoutDate PayoutDate @relation(fields:[payoutDateId], references:[id])
+  payments Payment[]
+  payout Payout?
+  @@unique([userId,circleId])
+}
+
+model Payment {
+  id String @id @default(cuid())
+  userId String
+  circleId String
+  membershipId String?
+  paypalOrderId String? @unique
+  paypalCaptureId String? @unique
+  amountCents Int
+  paypalFeeCents Int?
+  status PaymentStatus @default(CREATED)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId], references:[id])
+  circle Circle @relation(fields:[circleId], references:[id])
+  membership Membership? @relation(fields:[membershipId], references:[id])
+}
+
+model Payout {
+  id String @id @default(cuid())
+  userId String
+  circleId String
+  membershipId String @unique
+  payoutDateId String
+  amountCents Int
+  status PayoutStatus @default(SCHEDULED)
+  paypalBatchId String?
+  paypalItemId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields:[userId], references:[id])
+  circle Circle @relation(fields:[circleId], references:[id])
+  membership Membership @relation(fields:[membershipId], references:[id])
+  payoutDate PayoutDate @relation(fields:[payoutDateId], references:[id])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  actorUserId String?
+  action String
+  entityType String
+  entityId String?
+  metadata Json?
+  createdAt DateTime @default(now())
+}
