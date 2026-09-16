@@ -1,187 +1,1855 @@
-Redesign PayaCircle into a modern, premium, secure member savings platform.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PayaCircle — modern community savings circles with secure contributions and scheduled payouts.">
+  <title>PayaCircle — Save Together. Grow Together.</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
 
-The public homepage and authenticated member account must feel like two separate experiences.
+<body>
 
-PUBLIC WEBSITE:
-- Keep the existing PayaCircle branding.
-- Keep the public homepage, hero section, circles information, how-it-works, security section and Get Started / Sign In actions.
-- Do not show the member dashboard underneath the public homepage.
-- When a user signs in successfully, transition them into a dedicated authenticated account area.
-- When they sign out, return them to the public homepage.
+  <!-- =========================================================
+       PUBLIC WEBSITE
+       ========================================================= -->
 
-AUTHENTICATED MEMBER AREA:
-Create a complete "My PayaCircle" account experience inspired by the organization, usability and comfort of modern accounts such as Wayfair's My Account area, but do not copy Wayfair's branding or design.
+  <div id="publicSite">
 
-The member area should include:
+    <div class="announcement">
+      <span>Secure community savings</span>
+      <span>•</span>
+      <span>Simple contributions</span>
+      <span>•</span>
+      <span>Scheduled payouts</span>
+    </div>
 
-1. ACCOUNT HEADER
-- PayaCircle logo/brand
-- "My PayaCircle"
-- Member name
-- Member email
-- Notifications icon
-- Profile/account menu
-- Secure account indicator
-- Sign Out
+    <header class="site-header">
+      <a href="/" class="brand" id="publicBrand">
+        <span class="brand-mark">P</span>
+        <span>
+          <strong>PayaCircle</strong>
+          <small>Save together. Grow together.</small>
+        </span>
+      </a>
 
-2. ACCOUNT NAVIGATION
-Desktop:
-- Overview
-- My Circles
-- Contributions
-- Payouts
-- Payment Methods
-- Profile & Settings
-- Security
-- Help & Support
+      <nav class="public-nav">
+        <a href="#circles">Circles</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#security">Security</a>
+      </nav>
 
-Mobile:
-- Home
-- Circles
-- Payments
-- Payouts
-- Account
+      <div class="header-actions">
+        <button class="ghost" id="headerSignIn">Sign In</button>
+        <button class="primary" id="headerGetStarted">Get Started</button>
+      </div>
+    </header>
 
-3. OVERVIEW DASHBOARD
-Create attractive visual cards for:
-- Total Savings
-- Available Balance
-- Next Payout
-- Active Circles
+    <main class="public-main">
 
-Include:
-- Savings progress visualization
-- Upcoming payout section
-- Recent transactions
-- Active savings circles
-- Quick actions
-- Join a Circle
-- Create a Circle
-- Make a Contribution
-- View Payouts
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">COMMUNITY SAVINGS, REIMAGINED</div>
 
-Do not display account numbers, balances or financial figures as random plain text. Use polished cards, spacing, typography, icons and clear hierarchy.
+          <h1>Save together.<br><span>Grow together.</span></h1>
 
-4. MY CIRCLES
-Each circle should have a modern card containing:
-- Circle name
-- Circle type
-- Contribution amount
-- Member count
-- User's payout date
-- Payment status
-- Circle progress
-- Payout status
-- View Circle button
+          <p>
+            PayaCircle makes community savings simple, organized and secure.
+            Choose a circle, make your contribution and stay on track toward
+            your scheduled payout.
+          </p>
 
-5. CONTRIBUTIONS
-Create a transaction-style page showing:
-- Contribution amount
-- Circle
-- Date
-- Payment method
-- Payment status
-- PayPal transaction reference when available
+          <div class="hero-actions">
+            <button class="primary large" id="heroGetStarted">
+              Get Started
+            </button>
 
-Use clear status badges such as:
-Paid
-Pending
-Failed
-Refunded
+            <button class="ghost large" id="heroSignIn">
+              Sign In
+            </button>
+          </div>
 
-6. PAYOUTS
-Show:
-- Upcoming payout
-- Payout amount
-- Scheduled date
-- Circle
-- Payout status
-- Previous payouts
+          <div class="trust-row">
+            <span>✓ Secure account access</span>
+            <span>✓ Protected payments</span>
+            <span>✓ Clear payout scheduling</span>
+          </div>
+        </div>
 
-Use a visual timeline where appropriate.
+        <div class="hero-visual">
+          <div class="hero-card hero-card-main">
+            <div class="hero-card-top">
+              <span class="mini-label">YOUR SAVINGS</span>
+              <span class="secure-pill">SECURE</span>
+            </div>
 
-7. PAYMENT METHODS
-Create a secure-looking payment section for PayPal.
-Do not display PayPal secrets or sensitive credentials.
-Show connected/payment status and appropriate PayPal actions.
+            <div class="hero-balance">$1,250.00</div>
 
-8. PROFILE & SETTINGS
-Allow the interface to display:
-- Name
-- Email
-- PayPal email
-- Account preferences
-- Notification preferences
+            <div class="hero-progress">
+              <div class="hero-progress-bar"></div>
+            </div>
 
-9. SECURITY
-Include:
-- Password/security section
-- Secure session indicator
-- Account protection information
-- Sign-out-all-sessions style UI if backend support is added later
-- Never expose passwords, JWT secrets, PayPal secrets or database credentials.
+            <div class="hero-card-bottom">
+              <span>Circle progress</span>
+              <strong>75%</strong>
+            </div>
+          </div>
 
-10. HELP & SUPPORT
-Create a clean support section with:
-- Frequently asked questions
-- Contact support
-- Payment help
-- Circle help
-- Payout help
+          <div class="floating-card floating-card-one">
+            <span class="floating-icon">✓</span>
+            <div>
+              <strong>Contribution received</strong>
+              <small>Payment confirmed</small>
+            </div>
+          </div>
 
-DESIGN:
-- Modern fintech/e-commerce account dashboard.
-- Premium but approachable.
-- Spacious layout.
-- Rounded cards.
-- Subtle shadows.
-- Excellent typography hierarchy.
-- Professional buttons.
-- Attractive icons.
-- Responsive on iPhone, Android, tablet and desktop.
-- Comfortable touch targets.
-- Clear empty states.
-- Loading states.
-- Success states.
-- Error states.
-- Avoid walls of plain text.
-- Avoid making the interface look like a basic HTML form.
-- Keep the design consistent with the existing PayaCircle branding.
-- Use CSS rather than external UI frameworks unless already installed.
-- Do not break existing functionality.
+          <div class="floating-card floating-card-two">
+            <span class="floating-icon">↗</span>
+            <div>
+              <strong>Upcoming payout</strong>
+              <small>Scheduled securely</small>
+            </div>
+          </div>
+        </div>
+      </section>
 
-SECURITY/FUNCTIONAL REQUIREMENTS:
-- Preserve existing registration.
-- Preserve existing login.
-- Preserve existing logout.
-- Preserve existing authentication cookie.
-- Preserve existing Postgres/Prisma functionality.
-- Preserve existing savings-circle functionality.
-- Preserve PayPal Sandbox integration.
-- Never put secrets in frontend JavaScript.
-- Never display JWT_SECRET, DATABASE_URL, PAYPAL_CLIENT_SECRET or other secrets.
-- Authenticated API data must continue to come from the backend.
-- Do not fake successful payments.
-- PayPal payment status must continue to be confirmed by the backend.
-- Keep the application compatible with the existing Railway deployment.
+      <section class="levels-section" id="circles">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">SAVINGS CIRCLES</div>
+            <h2>Choose a circle that fits your goal.</h2>
+          </div>
 
-IMPLEMENTATION:
-Do not try to change every file at once.
-Implement the redesign in this order:
+          <p>
+            Start small or build a larger savings plan with a community
+            you trust.
+          </p>
+        </div>
 
-STEP 1:
-public/index.html — create the complete structure for the new authenticated member account.
+        <div id="publicCircles" class="cards">
+          <div class="empty-state">
+            <div class="empty-icon">◌</div>
+            <strong>Loading circles</strong>
+            <span>Available savings circles will appear here.</span>
+          </div>
+        </div>
+      </section>
 
-STEP 2:
-public/app.css — create the complete modern responsive visual design.
+      <section class="how-section" id="how-it-works">
+        <div class="section-heading centered">
+          <div class="eyebrow">HOW IT WORKS</div>
+          <h2>A simpler way to save with others.</h2>
+          <p>
+            PayaCircle keeps your savings journey organized from enrollment
+            through payout.
+          </p>
+        </div>
 
-STEP 3:
-public/app.js — connect the new account navigation, dashboard cards, circles, contributions, payouts, profile and existing PayPal functionality to the backend.
+        <div class="how-grid">
+          <article class="how-card">
+            <div class="how-number">01</div>
+            <div class="how-icon">◎</div>
+            <h3>Create your account</h3>
+            <p>
+              Register securely and access your personal PayaCircle member
+              area.
+            </p>
+          </article>
 
-STEP 4:
-src/server.js — only make backend changes that are genuinely required for the new account functionality.
+          <article class="how-card">
+            <div class="how-number">02</div>
+            <div class="how-icon">◫</div>
+            <h3>Choose your circle</h3>
+            <p>
+              Select a savings circle and contribution amount that works
+              for you.
+            </p>
+          </article>
 
-STEP 5:
-Test registration, login, logout, dashboard loading, circles, membership selection and PayPal Sandbox.
+          <article class="how-card">
+            <div class="how-number">03</div>
+            <div class="how-icon">✓</div>
+            <h3>Make your contribution</h3>
+            <p>
+              Complete your contribution securely through the available
+              payment flow.
+            </p>
+          </article>
 
-For each step, provide one complete replacement file only. Do not provide partial snippets. Do not change unrelated files.
+          <article class="how-card">
+            <div class="how-number">04</div>
+            <div class="how-icon">↗</div>
+            <h3>Receive your payout</h3>
+            <p>
+              Keep track of your scheduled payout directly from your account.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="stats-section">
+        <div class="stat-card">
+          <strong>$5–$100</strong>
+          <span>Contribution options</span>
+        </div>
+
+        <div class="stat-card">
+          <strong>4</strong>
+          <span>Circle types</span>
+        </div>
+
+        <div class="stat-card">
+          <strong>24/7</strong>
+          <span>Account access</span>
+        </div>
+
+        <div class="stat-card">
+          <strong>Secure</strong>
+          <span>Protected member area</span>
+        </div>
+      </section>
+
+      <section class="app-promo">
+        <div>
+          <div class="eyebrow">YOUR SAVINGS, ORGANIZED</div>
+          <h2>Everything important in one member account.</h2>
+          <p>
+            Review circles, contributions, payouts and account information
+            without having to search through different pages.
+          </p>
+
+          <button class="primary" id="promoGetStarted">
+            Open My PayaCircle
+          </button>
+        </div>
+
+        <div class="promo-preview">
+          <div class="preview-window">
+            <div class="preview-top">
+              <span class="preview-dot"></span>
+              <span class="preview-dot"></span>
+              <span class="preview-dot"></span>
+            </div>
+
+            <div class="preview-content">
+              <small>MY PAYACIRCLE</small>
+              <strong>Savings overview</strong>
+
+              <div class="preview-bars">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="security-section" id="security">
+        <div class="security-copy">
+          <div class="eyebrow">SECURITY FIRST</div>
+          <h2>Your account should feel protected.</h2>
+          <p>
+            PayaCircle keeps sensitive account and payment information behind
+            authenticated member access. Payment credentials and server
+            secrets are never displayed in the member interface.
+          </p>
+
+          <div class="security-list">
+            <div>
+              <span>✓</span>
+              <div>
+                <strong>Protected member sessions</strong>
+                <small>Your account is accessible only after authentication.</small>
+              </div>
+            </div>
+
+            <div>
+              <span>✓</span>
+              <div>
+                <strong>Secure payment flow</strong>
+                <small>Payment confirmation is handled through the backend.</small>
+              </div>
+            </div>
+
+            <div>
+              <span>✓</span>
+              <div>
+                <strong>Private account information</strong>
+                <small>Sensitive credentials are never shown in the interface.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="security-card">
+          <div class="security-card-icon">✓</div>
+          <strong>Member account protected</strong>
+          <span>Secure session</span>
+          <div class="security-line"></div>
+          <small>PayaCircle security</small>
+        </div>
+      </section>
+
+      <section class="final-cta">
+        <div>
+          <div class="eyebrow">READY WHEN YOU ARE</div>
+          <h2>Build a savings habit with your circle.</h2>
+          <p>
+            Create your account and start managing your savings journey
+            from one secure member space.
+          </p>
+        </div>
+
+        <button class="primary large" id="finalGetStarted">
+          Get Started
+        </button>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-brand">
+        <a href="/" class="brand">
+          <span class="brand-mark">P</span>
+          <span>
+            <strong>PayaCircle</strong>
+            <small>Save together. Grow together.</small>
+          </span>
+        </a>
+        <p>Modern community savings made simple.</p>
+      </div>
+
+      <div class="footer-links">
+        <a href="#circles">Circles</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#security">Security</a>
+        <button id="footerSignIn">Sign In</button>
+      </div>
+    </footer>
+
+  </div>
+
+
+  <!-- =========================================================
+       AUTHENTICATION MODAL
+       ========================================================= -->
+
+  <div class="modal-backdrop" id="authModal" style="display:none;">
+    <div class="modal auth-modal">
+
+      <button class="modal-close" id="closeAuthModal" aria-label="Close">
+        ×
+      </button>
+
+      <div class="modal-header">
+        <div class="modal-logo">P</div>
+        <div>
+          <div class="eyebrow">PAYACIRCLE</div>
+          <h2 id="authModalTitle">Create your account</h2>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="registerTab" class="auth-tab active">
+          Create Account
+        </button>
+        <button id="loginTab" class="auth-tab">
+          Sign In
+        </button>
+      </div>
+
+      <form id="registerForm" class="auth-form">
+
+        <label>
+          Full name
+          <input
+            id="registerName"
+            type="text"
+            autocomplete="name"
+            placeholder="Your full name"
+            required
+          >
+        </label>
+
+        <label>
+          Email address
+          <input
+            id="registerEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          >
+        </label>
+
+        <label>
+          Password
+          <input
+            id="registerPassword"
+            type="password"
+            autocomplete="new-password"
+            placeholder="At least 10 characters"
+            minlength="10"
+            required
+          >
+        </label>
+
+        <div class="form-security-note">
+          <span>✓</span>
+          <span>Your password is securely protected.</span>
+        </div>
+
+        <button class="primary full-width" type="submit">
+          Create Account
+        </button>
+
+        <div id="registerMessage" class="form-message"></div>
+      </form>
+
+      <form id="loginForm" class="auth-form" style="display:none;">
+
+        <label>
+          Email address
+          <input
+            id="loginEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          >
+        </label>
+
+        <label>
+          Password
+          <input
+            id="loginPassword"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Your password"
+            required
+          >
+        </label>
+
+        <div class="form-security-note">
+          <span>✓</span>
+          <span>Secure member sign in.</span>
+        </div>
+
+        <button class="primary full-width" type="submit">
+          Sign In
+        </button>
+
+        <div id="loginMessage" class="form-message"></div>
+      </form>
+
+    </div>
+  </div>
+
+
+  <!-- =========================================================
+       AUTHENTICATED MEMBER EXPERIENCE
+       ========================================================= -->
+
+  <section id="dashboard" class="account-shell" style="display:none;">
+
+    <!-- Account header -->
+    <header class="account-header">
+
+      <div class="account-header-left">
+
+        <a href="#" class="account-brand" id="accountBrand">
+          <span class="brand-mark">P</span>
+          <span>
+            <strong>PayaCircle</strong>
+            <small>My PayaCircle</small>
+          </span>
+        </a>
+
+        <div class="account-title-divider"></div>
+
+        <div class="account-page-label">
+          <strong>My PayaCircle</strong>
+          <span>Member account</span>
+        </div>
+
+      </div>
+
+      <div class="account-header-right">
+
+        <div class="account-secure-indicator">
+          <span class="secure-dot"></span>
+          <span>Secure account</span>
+        </div>
+
+        <button
+          class="account-icon-button"
+          id="accountNotifications"
+          aria-label="Notifications"
+          title="Notifications"
+        >
+          ♢
+          <span class="notification-dot"></span>
+        </button>
+
+        <button
+          class="account-profile-trigger"
+          id="accountProfileTrigger"
+          aria-label="Open account menu"
+        >
+          <span class="account-avatar dashboardUserInitials">M</span>
+          <span class="account-profile-text">
+            <strong id="dashboardUserName">Member</strong>
+            <small id="dashboardUserEmail">—</small>
+          </span>
+          <span class="account-chevron">⌄</span>
+        </button>
+
+        <button class="account-signout" id="dashboardLogout">
+          Sign Out
+        </button>
+
+      </div>
+
+    </header>
+
+
+    <!-- Mobile account header -->
+    <div class="mobile-account-header">
+
+      <div class="mobile-account-brand">
+        <span class="brand-mark">P</span>
+        <strong>PayaCircle</strong>
+      </div>
+
+      <div class="mobile-account-actions">
+        <button
+          class="account-icon-button"
+          id="mobileNotifications"
+          aria-label="Notifications"
+        >
+          ♢
+        </button>
+
+        <button
+          class="account-avatar dashboardUserInitials"
+          id="mobileProfileButton"
+          aria-label="Account"
+        >
+          M
+        </button>
+      </div>
+
+    </div>
+
+
+    <!-- Profile dropdown -->
+    <div class="account-profile-menu" id="accountProfileMenu" style="display:none;">
+
+      <div class="profile-menu-head">
+        <span class="account-avatar dashboardUserInitials">M</span>
+        <div>
+          <strong id="profileMenuName">Member</strong>
+          <small id="profileMenuEmail">—</small>
+        </div>
+      </div>
+
+      <button data-account-panel="profile">
+        <span>◉</span>
+        Profile & Settings
+      </button>
+
+      <button data-account-panel="security">
+        <span>◇</span>
+        Security
+      </button>
+
+      <button data-account-panel="help">
+        <span>?</span>
+        Help & Support
+      </button>
+
+      <div class="profile-menu-divider"></div>
+
+      <button id="profileMenuLogout" class="profile-menu-danger">
+        <span>↪</span>
+        Sign Out
+      </button>
+
+    </div>
+
+
+    <div class="account-layout">
+
+      <!-- Desktop sidebar -->
+      <aside class="account-sidebar">
+
+        <div class="sidebar-label">ACCOUNT</div>
+
+        <nav class="account-nav">
+
+          <button
+            class="account-nav-item active"
+            data-account-panel="overview"
+          >
+            <span class="nav-icon">⌂</span>
+            <span>Overview</span>
+          </button>
+
+          <button
+            class="account-nav-item"
+            data-account-panel="circles"
+          >
+            <span class="nav-icon">◎</span>
+            <span>My Circles</span>
+          </button>
+
+          <button
+            class="account-nav-item"
+            data-account-panel="contributions"
+          >
+            <span class="nav-icon">↙</span>
+            <span>Contributions</span>
+          </button>
+
+          <button
+            class="account-nav-item"
+            data-account-panel="payouts"
+          >
+            <span class="nav-icon">↗</span>
+            <span>Payouts</span>
+          </button>
+
+          <button
+            class="account-nav-item"
+            data-account-panel="payment-methods"
+          >
+            <span class="nav-icon">▣</span>
+            <span>Payment Methods</span>
+          </button>
+
+        </nav>
+
+        <div class="sidebar-label sidebar-label-lower">ACCOUNT SETTINGS</div>
+
+        <nav class="account-nav">
+
+          <button
+            class="account-nav-item"
+            data-account-panel="profile"
+          >
+            <span class="nav-icon">◉</span>
+            <span>Profile & Settings</span>
+          </button>
+
+          <button
+            class="account-nav-item"
+            data-account-panel="security"
+          >
+            <span class="nav-icon">◇</span>
+            <span>Security</span>
+          </button>
+
+          <button
+            class="account-nav-item"
+            data-account-panel="help"
+          >
+            <span class="nav-icon">?</span>
+            <span>Help & Support</span>
+          </button>
+
+        </nav>
+
+        <div class="sidebar-security-card">
+          <div class="sidebar-security-icon">✓</div>
+          <strong>Account protected</strong>
+          <span>Your member session is secured.</span>
+        </div>
+
+      </aside>
+
+
+      <!-- Main account content -->
+      <main class="account-main">
+
+        <!-- OVERVIEW -->
+        <section
+          class="account-panel active"
+          data-panel="overview"
+        >
+
+          <div class="account-welcome">
+
+            <div>
+              <div class="eyebrow">MEMBER OVERVIEW</div>
+              <h1>Welcome back, <span id="dashboardWelcomeName">Member</span></h1>
+              <p>
+                Here's your current savings activity and upcoming payouts.
+              </p>
+            </div>
+
+            <div class="welcome-secure">
+              <span class="secure-dot"></span>
+              Account secure
+            </div>
+
+          </div>
+
+
+          <!-- Summary cards -->
+          <div class="account-summary-grid">
+
+            <article class="account-summary-card savings-card">
+
+              <div class="summary-card-top">
+                <span class="summary-icon">◈</span>
+                <span class="summary-label">TOTAL SAVINGS</span>
+              </div>
+
+              <strong id="accountTotalSavings">$0.00</strong>
+
+              <div class="summary-bottom">
+                <span>Confirmed contributions</span>
+                <span class="summary-positive">● Active</span>
+              </div>
+
+            </article>
+
+
+            <article class="account-summary-card balance-card">
+
+              <div class="summary-card-top">
+                <span class="summary-icon">◉</span>
+                <span class="summary-label">AVAILABLE BALANCE</span>
+              </div>
+
+              <strong id="accountAvailableBalance">$0.00</strong>
+
+              <div class="summary-bottom">
+                <span>Current account activity</span>
+              </div>
+
+            </article>
+
+
+            <article class="account-summary-card payout-card">
+
+              <div class="summary-card-top">
+                <span class="summary-icon">↗</span>
+                <span class="summary-label">NEXT PAYOUT</span>
+              </div>
+
+              <strong id="dashboardNextPayout">—</strong>
+
+              <div class="summary-bottom">
+                <span>Scheduled payout</span>
+              </div>
+
+            </article>
+
+
+            <article class="account-summary-card circles-card">
+
+              <div class="summary-card-top">
+                <span class="summary-icon">◎</span>
+                <span class="summary-label">ACTIVE CIRCLES</span>
+              </div>
+
+              <strong id="dashboardCircleCount">0</strong>
+
+              <div class="summary-bottom">
+                <span>Current memberships</span>
+              </div>
+
+            </article>
+
+          </div>
+
+
+          <!-- Progress + payout -->
+          <div class="overview-grid">
+
+            <article class="account-card savings-progress-card">
+
+              <div class="card-heading">
+                <div>
+                  <div class="eyebrow">SAVINGS PROGRESS</div>
+                  <h2>Your savings journey</h2>
+                </div>
+
+                <strong id="accountProgress">0%</strong>
+              </div>
+
+              <div class="large-progress">
+                <div
+                  class="accountProgressBar"
+                  style="width:0%;"
+                ></div>
+              </div>
+
+              <div class="progress-labels">
+                <span>Current savings</span>
+                <span>Circle activity</span>
+              </div>
+
+              <div class="progress-info">
+                <span>
+                  Keep your contributions on schedule to stay on track.
+                </span>
+              </div>
+
+            </article>
+
+
+            <article class="account-card next-payout-card">
+
+              <div class="card-heading">
+                <div>
+                  <div class="eyebrow">UPCOMING PAYOUT</div>
+                  <h2>Your next payout</h2>
+                </div>
+
+                <span class="card-heading-icon">↗</span>
+              </div>
+
+              <div id="overviewPayoutContent" class="payout-highlight">
+                <div class="payout-placeholder-icon">↗</div>
+                <div>
+                  <strong id="overviewPayoutDate">No payout scheduled</strong>
+                  <span id="overviewPayoutDetails">
+                    Join a circle to schedule a payout.
+                  </span>
+                </div>
+              </div>
+
+              <button
+                class="text-button"
+                data-account-panel="payouts"
+              >
+                View all payouts →
+              </button>
+
+            </article>
+
+          </div>
+
+
+          <!-- Quick actions -->
+          <section class="quick-actions-section">
+
+            <div class="section-mini-heading">
+              <div>
+                <div class="eyebrow">QUICK ACTIONS</div>
+                <h2>Manage your savings</h2>
+              </div>
+            </div>
+
+            <div class="quick-actions-grid">
+
+              <button
+                class="quick-action"
+                data-account-panel="circles"
+              >
+                <span class="quick-action-icon">+</span>
+                <span>
+                  <strong>Join a Circle</strong>
+                  <small>Browse available savings circles</small>
+                </span>
+                <span class="quick-arrow">→</span>
+              </button>
+
+              <button
+                class="quick-action"
+                id="dashboardCreateCircle"
+              >
+                <span class="quick-action-icon">◎</span>
+                <span>
+                  <strong>Create a Circle</strong>
+                  <small>Start a circle for your community</small>
+                </span>
+                <span class="quick-arrow">→</span>
+              </button>
+
+              <button
+                class="quick-action"
+                data-account-panel="contributions"
+              >
+                <span class="quick-action-icon">↙</span>
+                <span>
+                  <strong>Make a Contribution</strong>
+                  <small>Manage your circle contributions</small>
+                </span>
+                <span class="quick-arrow">→</span>
+              </button>
+
+              <button
+                class="quick-action"
+                data-account-panel="payouts"
+              >
+                <span class="quick-action-icon">↗</span>
+                <span>
+                  <strong>View Payouts</strong>
+                  <small>Review scheduled and previous payouts</small>
+                </span>
+                <span class="quick-arrow">→</span>
+              </button>
+
+            </div>
+
+          </section>
+
+
+          <!-- Active circles -->
+          <section class="dashboard-section">
+
+            <div class="dashboard-section-head">
+
+              <div>
+                <div class="eyebrow">YOUR SAVINGS CIRCLES</div>
+                <h2>Active circles</h2>
+                <p>
+                  Keep track of your current savings memberships.
+                </p>
+              </div>
+
+              <button
+                class="secondary-button"
+                data-account-panel="circles"
+              >
+                View all circles
+              </button>
+
+            </div>
+
+            <div id="dashboardCircles" class="account-circle-grid">
+
+              <div class="empty-state">
+                <div class="empty-icon">◎</div>
+                <strong>No active circles yet</strong>
+                <span>
+                  Choose a savings circle to get started.
+                </span>
+                <button
+                  class="primary"
+                  data-account-panel="circles"
+                >
+                  Browse Circles
+                </button>
+              </div>
+
+            </div>
+
+          </section>
+
+
+          <!-- Recent transactions -->
+          <section class="dashboard-section">
+
+            <div class="dashboard-section-head">
+
+              <div>
+                <div class="eyebrow">RECENT ACTIVITY</div>
+                <h2>Recent transactions</h2>
+                <p>
+                  Your latest contribution activity.
+                </p>
+              </div>
+
+              <button
+                class="secondary-button"
+                data-account-panel="contributions"
+              >
+                View all
+              </button>
+
+            </div>
+
+            <div
+              id="contributionTransactions"
+              class="transaction-list"
+            >
+              <div class="empty-state compact">
+                <div class="empty-icon">↙</div>
+                <strong>No transactions yet</strong>
+                <span>Your confirmed contributions will appear here.</span>
+              </div>
+            </div>
+
+          </section>
+
+        </section>
+
+
+        <!-- MY CIRCLES -->
+        <section
+          class="account-panel"
+          data-panel="circles"
+          style="display:none;"
+        >
+
+          <div class="panel-page-header">
+
+            <div>
+              <div class="eyebrow">MY PAYACIRCLE</div>
+              <h1>My Circles</h1>
+              <p>
+                Manage your savings memberships and scheduled payout dates.
+              </p>
+            </div>
+
+            <button
+              class="primary"
+              id="circlesCreateButton"
+            >
+              Create a Circle
+            </button>
+
+          </div>
+
+          <div class="circle-filter-bar">
+
+            <button class="circle-filter active" data-circle-filter="all">
+              All Circles
+            </button>
+
+            <button class="circle-filter" data-circle-filter="active">
+              Active
+            </button>
+
+            <button class="circle-filter" data-circle-filter="pending">
+              Payment Pending
+            </button>
+
+          </div>
+
+          <div id="circlesPageGrid" class="account-circle-grid">
+
+            <div class="empty-state">
+              <div class="empty-icon">◎</div>
+              <strong>No circles found</strong>
+              <span>
+                Your savings circles will appear here.
+              </span>
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- CONTRIBUTIONS -->
+        <section
+          class="account-panel"
+          data-panel="contributions"
+          style="display:none;"
+        >
+
+          <div class="panel-page-header">
+
+            <div>
+              <div class="eyebrow">PAYMENT ACTIVITY</div>
+              <h1>Contributions</h1>
+              <p>
+                Review your savings contributions and payment history.
+              </p>
+            </div>
+
+            <div class="panel-secure-badge">
+              <span class="secure-dot"></span>
+              Payments protected
+            </div>
+
+          </div>
+
+          <div class="payment-summary">
+
+            <div class="payment-summary-card">
+              <span>Total contributions</span>
+              <strong id="contributionTotal">$0.00</strong>
+            </div>
+
+            <div class="payment-summary-card">
+              <span>Paid contributions</span>
+              <strong id="contributionPaidCount">0</strong>
+            </div>
+
+            <div class="payment-summary-card">
+              <span>Pending payments</span>
+              <strong id="contributionPendingCount">0</strong>
+            </div>
+
+          </div>
+
+          <div class="account-card">
+
+            <div class="table-heading">
+              <div>
+                <h2>Contribution history</h2>
+                <p>Your payment activity is shown below.</p>
+              </div>
+            </div>
+
+            <div
+              id="contributionsPageList"
+              class="transaction-list full"
+            >
+
+              <div class="empty-state compact">
+                <div class="empty-icon">↙</div>
+                <strong>No contribution history</strong>
+                <span>
+                  Confirmed payments will appear here.
+                </span>
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- PAYOUTS -->
+        <section
+          class="account-panel"
+          data-panel="payouts"
+          style="display:none;"
+        >
+
+          <div class="panel-page-header">
+
+            <div>
+              <div class="eyebrow">PAYOUTS</div>
+              <h1>Your Payouts</h1>
+              <p>
+                Track scheduled and completed circle payouts.
+              </p>
+            </div>
+
+          </div>
+
+          <div class="payout-overview-card">
+
+            <div class="payout-overview-icon">↗</div>
+
+            <div class="payout-overview-content">
+              <span class="eyebrow">NEXT SCHEDULED PAYOUT</span>
+              <strong id="payoutPageNextAmount">$0.00</strong>
+              <span id="payoutPageNextDate">
+                No payout currently scheduled
+              </span>
+            </div>
+
+            <div class="payout-overview-status">
+              <span class="status-badge pending">Scheduled</span>
+            </div>
+
+          </div>
+
+          <div class="account-card">
+
+            <div class="table-heading">
+              <div>
+                <div class="eyebrow">PAYOUT TIMELINE</div>
+                <h2>Upcoming & previous payouts</h2>
+              </div>
+            </div>
+
+            <div
+              id="payoutTimeline"
+              class="payout-timeline"
+            >
+
+              <div class="empty-state compact">
+                <div class="empty-icon">↗</div>
+                <strong>No payouts yet</strong>
+                <span>
+                  Your payout schedule will appear here after joining a circle.
+                </span>
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- PAYMENT METHODS -->
+        <section
+          class="account-panel"
+          data-panel="payment-methods"
+          style="display:none;"
+        >
+
+          <div class="panel-page-header">
+
+            <div>
+              <div class="eyebrow">PAYMENT METHODS</div>
+              <h1>Payment Methods</h1>
+              <p>
+                Manage the payment method used for your PayaCircle
+                contributions.
+              </p>
+            </div>
+
+          </div>
+
+          <div class="payment-method-card">
+
+            <div class="payment-method-brand">
+              <span class="paypal-mark">P</span>
+              <div>
+                <strong>PayPal</strong>
+                <span>Secure online payments</span>
+              </div>
+            </div>
+
+            <div class="payment-method-status">
+              <span class="status-badge secure">Available</span>
+            </div>
+
+          </div>
+
+          <div class="account-card payment-security-card">
+
+            <div class="security-inline-icon">✓</div>
+
+            <div>
+              <h2>Secure payment processing</h2>
+              <p>
+                PayaCircle does not display or store your PayPal password,
+                PayPal client secret or other payment credentials in your
+                member account.
+              </p>
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- PROFILE -->
+        <section
+          class="account-panel"
+          data-panel="profile"
+          style="display:none;"
+        >
+
+          <div class="panel-page-header">
+
+            <div>
+              <div class="eyebrow">ACCOUNT SETTINGS</div>
+              <h1>Profile & Settings</h1>
+              <p>
+                Review your member information and account preferences.
+              </p>
+            </div>
+
+          </div>
+
+          <div class="settings-grid">
+
+            <div class="account-card settings-card">
+
+              <div class="settings-card-heading">
+                <span class="settings-icon">◉</span>
+                <div>
+                  <h2>Personal information</h2>
+                  <p>Your basic member information.</p>
+                </div>
+              </div>
+
+              <div class="profile-fields">
+
+                <div class="profile-field">
+                  <span>Full name</span>
+                  <strong id="profileName">—</strong>
+                </div>
+
+                <div class="profile-field">
+                  <span>Email address</span>
+                  <strong id="profileEmail">—</strong>
+                </div>
+
+                <div class="profile-field">
+                  <span>PayPal email</span>
+                  <strong id="profilePaypalEmail">Not provided</strong>
+                </div>
+
+              </div>
+
+            </div>
+
+
+            <div class="account-card settings-card">
+
+              <div class="settings-card-heading">
+                <span class="settings-icon">◇</span>
+                <div>
+                  <h2>Preferences</h2>
+                  <p>Manage how your account communicates with you.</p>
+                </div>
+              </div>
+
+              <div class="settings-options">
+
+                <div class="setting-row">
+                  <div>
+                    <strong>Account notifications</strong>
+                    <span>Receive important account updates.</span>
+                  </div>
+                  <span class="setting-toggle active">ON</span>
+                </div>
+
+                <div class="setting-row">
+                  <div>
+                    <strong>Payment notifications</strong>
+                    <span>Receive contribution status updates.</span>
+                  </div>
+                  <span class="setting-toggle active">ON</span>
+                </div>
+
+                <div class="setting-row">
+                  <div>
+                    <strong>Payout reminders</strong>
+                    <span>Stay informed about upcoming payouts.</span>
+                  </div>
+                  <span class="setting-toggle active">ON</span>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- SECURITY -->
+        <section
+          class="account-panel"
+          data-panel="security"
+          style="display:none;"
+        >
+
+          <div class="panel-page-header">
+
+            <div>
+              <div class="eyebrow">ACCOUNT PROTECTION</div>
+              <h1>Security</h1>
+              <p>
+                Review your account security and session protection.
+              </p>
+            </div>
+
+            <div class="panel-secure-badge">
+              <span class="secure-dot"></span>
+              Secure session
+            </div>
+
+          </div>
+
+          <div class="security-overview-card">
+
+            <div class="security-overview-icon">✓</div>
+
+            <div>
+              <span class="eyebrow">CURRENT SESSION</span>
+              <h2>Your account is protected</h2>
+              <p>
+                Your authenticated session is protected by the PayaCircle
+                backend.
+              </p>
+            </div>
+
+            <span class="status-badge secure">Protected</span>
+
+          </div>
+
+          <div class="settings-grid">
+
+            <div class="account-card settings-card">
+
+              <div class="settings-card-heading">
+                <span class="settings-icon">◇</span>
+                <div>
+                  <h2>Password</h2>
+                  <p>
+                    Keep your account password private and secure.
+                  </p>
+                </div>
+              </div>
+
+              <div class="security-action-row">
+                <div>
+                  <strong>Password protection</strong>
+                  <span>
+                    Passwords are never displayed in your account.
+                  </span>
+                </div>
+
+                <button class="secondary-button setting-action">
+                  Manage
+                </button>
+              </div>
+
+            </div>
+
+
+            <div class="account-card settings-card">
+
+              <div class="settings-card-heading">
+                <span class="settings-icon">▣</span>
+                <div>
+                  <h2>Active session</h2>
+                  <p>
+                    Your current authenticated member session.
+                  </p>
+                </div>
+              </div>
+
+              <div class="security-action-row">
+                <div>
+                  <strong>This device</strong>
+                  <span>Current PayaCircle session</span>
+                </div>
+
+                <span class="status-badge secure">Active</span>
+              </div>
+
+            </div>
+
+
+            <div class="account-card settings-card">
+
+              <div class="settings-card-heading">
+                <span class="settings-icon">↪</span>
+                <div>
+                  <h2>Sign out everywhere</h2>
+                  <p>
+                    Additional session management can be enabled when
+                    supported by the backend.
+                  </p>
+                </div>
+              </div>
+
+              <div class="security-action-row">
+                <div>
+                  <strong>All sessions</strong>
+                  <span>Sign out of other devices.</span>
+                </div>
+
+                <button
+                  class="secondary-button setting-action"
+                  disabled
+                >
+                  Coming Soon
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- HELP -->
+        <section
+          class="account-panel"
+          data-panel="help"
+          style="display:none;"
+        >
+
+          <div class="panel-page-header">
+
+            <div>
+              <div class="eyebrow">SUPPORT CENTER</div>
+              <h1>Help & Support</h1>
+              <p>
+                Find answers and get help with your PayaCircle account.
+              </p>
+            </div>
+
+          </div>
+
+          <div class="help-grid">
+
+            <button class="help-card">
+              <span class="help-icon">?</span>
+              <div>
+                <strong>Frequently asked questions</strong>
+                <span>Find answers to common account questions.</span>
+              </div>
+              <b>→</b>
+            </button>
+
+            <button class="help-card">
+              <span class="help-icon">↙</span>
+              <div>
+                <strong>Payment help</strong>
+                <span>Get help with contributions and payment status.</span>
+              </div>
+              <b>→</b>
+            </button>
+
+            <button class="help-card">
+              <span class="help-icon">◎</span>
+              <div>
+                <strong>Circle help</strong>
+                <span>Learn how circle memberships work.</span>
+              </div>
+              <b>→</b>
+            </button>
+
+            <button class="help-card">
+              <span class="help-icon">↗</span>
+              <div>
+                <strong>Payout help</strong>
+                <span>Understand payout scheduling and status.</span>
+              </div>
+              <b>→</b>
+            </button>
+
+            <button class="help-card support-card">
+              <span class="help-icon">✉</span>
+              <div>
+                <strong>Contact support</strong>
+                <span>Need additional help? Contact PayaCircle support.</span>
+              </div>
+              <b>→</b>
+            </button>
+
+          </div>
+
+          <div class="faq-section">
+
+            <div class="eyebrow">COMMON QUESTIONS</div>
+            <h2>Frequently asked questions</h2>
+
+            <div class="faq-list">
+
+              <details>
+                <summary>
+                  How do I join a savings circle?
+                  <span>+</span>
+                </summary>
+                <p>
+                  Open My Circles, choose an available circle, select your
+                  payout date and continue through the contribution process.
+                </p>
+              </details>
+
+              <details>
+                <summary>
+                  When is my contribution considered paid?
+                  <span>+</span>
+                </summary>
+                <p>
+                  Your contribution is considered paid only after the
+                  payment is successfully confirmed by the backend payment
+                  process.
+                </p>
+              </details>
+
+              <details>
+                <summary>
+                  Where can I see my payout date?
+                  <span>+</span>
+                </summary>
+                <p>
+                  Your scheduled payout is displayed in Overview, My Circles
+                  and Payouts.
+                </p>
+              </details>
+
+              <details>
+                <summary>
+                  Is my PayPal password stored by PayaCircle?
+                  <span>+</span>
+                </summary>
+                <p>
+                  No. Sensitive PayPal credentials are not displayed in
+                  your PayaCircle member interface.
+                </p>
+              </details>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- PAYMENT PANEL -->
+        <section
+          id="paymentPanel"
+          class="payment-panel account-card"
+          style="display:none;"
+        >
+
+          <div class="payment-panel-heading">
+            <div>
+              <div class="eyebrow">COMPLETE CONTRIBUTION</div>
+              <h2>Review your contribution</h2>
+              <p>
+                Confirm your circle and contribution before continuing to
+                PayPal.
+              </p>
+            </div>
+
+            <span class="payment-secure">
+              <span class="secure-dot"></span>
+              Secure payment
+            </span>
+          </div>
+
+          <div id="paymentDetails" class="payment-details"></div>
+
+          <div class="payment-actions">
+            <button
+              id="paypalButton"
+              class="primary paypal-button"
+            >
+              Continue with PayPal
+            </button>
+
+            <button
+              id="cancelPayment"
+              class="ghost"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <p class="payment-note">
+            Your membership remains payment-pending until the payment is
+            successfully confirmed by the backend.
+          </p>
+
+        </section>
+
+
+        <!-- PAYMENT SUCCESS -->
+        <section
+          id="paymentSuccess"
+          class="dashboard-success"
+          style="display:none;"
+        >
+
+          <div class="success-icon">✓</div>
+
+          <div>
+            <div class="eyebrow">PAYMENT CONFIRMED</div>
+            <h2>Your contribution was received.</h2>
+            <p>
+              Your PayaCircle membership has been updated. Your scheduled
+              payout information is now shown in your account.
+            </p>
+
+            <button
+              class="primary"
+              data-account-panel="overview"
+            >
+              Return to Overview
+            </button>
+          </div>
+
+        </section>
+
+      </main>
+
+    </div>
+
+
+    <!-- Mobile bottom navigation -->
+    <nav class="mobile-account-nav">
+
+      <button
+        class="mobile-nav-item active"
+        data-account-panel="overview"
+      >
+        <span>⌂</span>
+        <small>Home</small>
+      </button>
+
+      <button
+        class="mobile-nav-item"
+        data-account-panel="circles"
+      >
+        <span>◎</span>
+        <small>Circles</small>
+      </button>
+
+      <button
+        class="mobile-nav-item"
+        data-account-panel="contributions"
+      >
+        <span>↙</span>
+        <small>Payments</small>
+      </button>
+
+      <button
+        class="mobile-nav-item"
+        data-account-panel="payouts"
+      >
+        <span>↗</span>
+        <small>Payouts</small>
+      </button>
+
+      <button
+        class="mobile-nav-item"
+        data-account-panel="profile"
+      >
+        <span>◉</span>
+        <small>Account</small>
+      </button>
+
+    </nav>
+
+  </section>
+
+
+  <!-- =========================================================
+       CREATE CIRCLE MODAL
+       ========================================================= -->
+
+  <div
+    class="modal-backdrop"
+    id="circleModal"
+    style="display:none;"
+  >
+
+    <div class="modal circle-modal">
+
+      <button
+        class="modal-close"
+        id="closeCircleModal"
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+      <div class="modal-header">
+        <div class="modal-logo">◎</div>
+        <div>
+          <div class="eyebrow">NEW SAVINGS CIRCLE</div>
+          <h2>Create a Circle</h2>
+        </div>
+      </div>
+
+      <form id="circleForm" class="auth-form">
+
+        <label>
+          Circle name
+          <input
+            id="circleName"
+            type="text"
+            placeholder="Example: Family Savings"
+            minlength="2"
+            maxlength="80"
+            required
+          >
+        </label>
+
+        <label>
+          Circle type
+          <select id="circleType" required>
+            <option value="FAMILY">Family</option>
+            <option value="FRIENDS">Friends</option>
+            <option value="SOCIAL_MEDIA">Social Media</option>
+            <option value="CUSTOM">Custom</option>
+          </select>
+        </label>
+
+        <label>
+          Contribution amount
+          <select id="circleAmount" required>
+            <option value="5">$5 USD</option>
+            <option value="10">$10 USD</option>
+            <option value="15">$15 USD</option>
+            <option value="20">$20 USD</option>
+            <option value="25">$25 USD</option>
+            <option value="30">$30 USD</option>
+            <option value="35">$35 USD</option>
+            <option value="40">$40 USD</option>
+            <option value="45">$45 USD</option>
+            <option value="50">$50 USD</option>
+            <option value="55">$55 USD</option>
+            <option value="60">$60 USD</option>
+            <option value="65">$65 USD</option>
+            <option value="70">$70 USD</option>
+            <option value="75">$75 USD</option>
+            <option value="80">$80 USD</option>
+            <option value="85">$85 USD</option>
+            <option value="90">$90 USD</option>
+            <option value="95">$95 USD</option>
+            <option value="100">$100 USD</option>
+          </select>
+        </label>
+
+        <label>
+          Number of members
+          <input
+            id="circleCapacity"
+            type="number"
+            min="2"
+            max="1000"
+            value="10"
+            required
+          >
+        </label>
+
+        <button
+          type="submit"
+          class="primary full-width"
+        >
+          Create Circle
+        </button>
+
+        <div
+          id="circleMessage"
+          class="form-message"
+        ></div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================================================
+       CIRCLE DETAILS MODAL
+       ========================================================= -->
+
+  <div
+    class="modal-backdrop"
+    id="circleDetailsModal"
+    style="display:none;"
+  >
+
+    <div class="modal circle-details-modal">
+
+      <button
+        class="modal-close"
+        id="closeCircleDetailsModal"
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+      <div id="circleDetailsContent"></div>
+
+    </div>
+
+  </div>
+
+
+  <!-- Existing frontend logic -->
+  <script src="/app.js"></script>
+
+</body>
+</html>
