@@ -191,16 +191,19 @@ function setLoading(button, loading, loadingText = "Please wait...") {
   }
 }
 
-/* AUTH */
+/* =========================================================
+   MODALS
+   ========================================================= */
 
 function openModal(id) {
   const modal = document.getElementById(id);
 
   if (!modal) return;
 
-  modal.classList.add("active");
   modal.hidden = false;
+  modal.classList.add("active");
   modal.setAttribute("aria-hidden", "false");
+
   document.body.classList.add("modal-open");
 }
 
@@ -225,6 +228,10 @@ function closeAllModals() {
 
   document.body.classList.remove("modal-open");
 }
+
+/* =========================================================
+   AUTH
+   ========================================================= */
 
 function switchAuth(mode) {
   const loginForm = $("#loginForm");
@@ -308,7 +315,9 @@ function bindAuthButtons() {
   }
 }
 
-/* REGISTER */
+/* =========================================================
+   REGISTER
+   ========================================================= */
 
 async function registerUser(event) {
   event.preventDefault();
@@ -316,17 +325,9 @@ async function registerUser(event) {
   const form = event.currentTarget;
   const button = form.querySelector('button[type="submit"]');
 
-  const name = form
-    .querySelector('[name="name"]')
-    ?.value.trim();
-
-  const email = form
-    .querySelector('[name="email"]')
-    ?.value.trim();
-
-  const password = form
-    .querySelector('[name="password"]')
-    ?.value;
+  const name = form.querySelector('[name="name"]')?.value.trim();
+  const email = form.querySelector('[name="email"]')?.value.trim();
+  const password = form.querySelector('[name="password"]')?.value;
 
   if (!name || !email || !password) {
     showToast("Please complete all fields.", "error");
@@ -349,10 +350,7 @@ async function registerUser(event) {
 
     closeAllModals();
 
-    showToast(
-      "Account created successfully.",
-      "success"
-    );
+    showToast("Account created successfully.", "success");
 
     await showDashboard();
   } catch (error) {
@@ -362,7 +360,9 @@ async function registerUser(event) {
   }
 }
 
-/* LOGIN */
+/* =========================================================
+   LOGIN
+   ========================================================= */
 
 async function loginUser(event) {
   event.preventDefault();
@@ -370,19 +370,11 @@ async function loginUser(event) {
   const form = event.currentTarget;
   const button = form.querySelector('button[type="submit"]');
 
-  const email = form
-    .querySelector('[name="email"]')
-    ?.value.trim();
-
-  const password = form
-    .querySelector('[name="password"]')
-    ?.value;
+  const email = form.querySelector('[name="email"]')?.value.trim();
+  const password = form.querySelector('[name="password"]')?.value;
 
   if (!email || !password) {
-    showToast(
-      "Please enter your email and password.",
-      "error"
-    );
+    showToast("Please enter your email and password.", "error");
     return;
   }
 
@@ -401,10 +393,7 @@ async function loginUser(event) {
 
     closeAllModals();
 
-    showToast(
-      "Signed in successfully.",
-      "success"
-    );
+    showToast("Signed in successfully.", "success");
 
     await showDashboard();
   } catch (error) {
@@ -414,7 +403,9 @@ async function loginUser(event) {
   }
 }
 
-/* LOGOUT */
+/* =========================================================
+   LOGOUT
+   ========================================================= */
 
 async function logoutUser() {
   try {
@@ -430,13 +421,12 @@ async function logoutUser() {
 
   hideDashboard();
 
-  showToast(
-    "You have been signed out.",
-    "success"
-  );
+  showToast("You have been signed out.", "success");
 }
 
-/* DASHBOARD VISIBILITY */
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
 
 function hideDashboard() {
   const dashboard = $("#dashboard");
@@ -456,6 +446,7 @@ function hideDashboard() {
   });
 
   document.body.classList.remove("dashboard-active");
+  document.body.classList.remove("account-open");
 }
 
 function showDashboardElements() {
@@ -476,6 +467,7 @@ function showDashboardElements() {
   }
 
   document.body.classList.add("dashboard-active");
+  document.body.classList.add("account-open");
 }
 
 async function showDashboard() {
@@ -494,7 +486,9 @@ async function showDashboard() {
   }
 }
 
-/* CURRENT USER */
+/* =========================================================
+   CURRENT USER
+   ========================================================= */
 
 async function loadCurrentUser() {
   try {
@@ -512,7 +506,9 @@ async function loadCurrentUser() {
   }
 }
 
-/* DASHBOARD DATA */
+/* =========================================================
+   DASHBOARD DATA
+   ========================================================= */
 
 async function refreshDashboard() {
   const user = await loadCurrentUser();
@@ -532,7 +528,9 @@ async function refreshDashboard() {
   renderProfile();
 }
 
-/* USER HEADER */
+/* =========================================================
+   USER HEADER
+   ========================================================= */
 
 function renderUserHeader() {
   if (!currentUser) return;
@@ -551,12 +549,6 @@ function renderUserHeader() {
     }
   });
 
-  const profileName = $("#profileName");
-
-  if (profileName) {
-    profileName.value = name;
-  }
-
   [
     "#dashboardUserEmail",
     "#accountUserEmail"
@@ -567,6 +559,12 @@ function renderUserHeader() {
       element.textContent = email;
     }
   });
+
+  const profileName = $("#profileName");
+
+  if (profileName) {
+    profileName.value = name;
+  }
 
   const profileEmail = $("#profileEmail");
 
@@ -579,14 +577,14 @@ function renderUserHeader() {
   });
 }
 
-/* OVERVIEW */
+/* =========================================================
+   OVERVIEW
+   ========================================================= */
 
 function renderDashboardOverview() {
   if (!currentUser) return;
 
-  const memberships = Array.isArray(
-    currentUser.memberships
-  )
+  const memberships = Array.isArray(currentUser.memberships)
     ? currentUser.memberships
     : [];
 
@@ -599,79 +597,56 @@ function renderDashboardOverview() {
 
   const totalSavings = paidMemberships.reduce(
     (total, membership) =>
-      total +
-      Number(
-        membership.circle?.amountCents || 0
-      ),
+      total + Number(membership.circle?.amountCents || 0),
     0
   );
 
   const completedPayouts = memberships.filter(
-    membership =>
-      membership.status === "PAID_OUT"
+    membership => membership.status === "PAID_OUT"
   );
 
   const payoutTotal = completedPayouts.reduce(
     (total, membership) =>
-      total +
-      Number(
-        membership.circle?.amountCents || 0
-      ),
+      total + Number(membership.circle?.amountCents || 0),
     0
   );
 
   const activeContribution = memberships
-    .filter(
-      membership =>
-        membership.status !== "CANCELLED"
-    )
+    .filter(membership => membership.status !== "CANCELLED")
     .reduce(
       (total, membership) =>
-        total +
-        Number(
-          membership.circle?.amountCents || 0
-        ),
+        total + Number(membership.circle?.amountCents || 0),
       0
     );
 
-  const totalSavingsElement =
-    $("#accountTotalSavings");
+  const totalSavingsElement = $("#accountTotalSavings");
 
   if (totalSavingsElement) {
-    totalSavingsElement.textContent =
-      money(totalSavings);
+    totalSavingsElement.textContent = money(totalSavings);
   }
 
-  const balanceElement =
-    $("#accountAvailableBalance");
+  const balanceElement = $("#accountAvailableBalance");
 
   if (balanceElement) {
-    balanceElement.textContent =
-      money(payoutTotal);
+    balanceElement.textContent = money(payoutTotal);
   }
 
-  const contributionElement =
-    $("#accountContributionTotal");
+  const contributionElement = $("#accountContributionTotal");
 
   if (contributionElement) {
-    contributionElement.textContent =
-      money(activeContribution);
+    contributionElement.textContent = money(activeContribution);
   }
 
-  const circlesElement =
-    $("#accountCircleCount");
+  const circlesElement = $("#accountCircleCount");
 
   if (circlesElement) {
-    circlesElement.textContent =
-      memberships.length;
+    circlesElement.textContent = memberships.length;
   }
 
-  const payoutElement =
-    $("#accountPayoutTotal");
+  const payoutElement = $("#accountPayoutTotal");
 
   if (payoutElement) {
-    payoutElement.textContent =
-      money(payoutTotal);
+    payoutElement.textContent = money(payoutTotal);
   }
 
   const progress =
@@ -679,19 +654,15 @@ function renderDashboardOverview() {
       ? Math.min(
           100,
           Math.round(
-            (paidMemberships.length /
-              memberships.length) *
-              100
+            (paidMemberships.length / memberships.length) * 100
           )
         )
       : 0;
 
-  const progressElement =
-    $("#accountProgress");
+  const progressElement = $("#accountProgress");
 
   if (progressElement) {
-    progressElement.textContent =
-      `${progress}%`;
+    progressElement.textContent = `${progress}%`;
   }
 
   $$(".accountProgressBar").forEach(bar => {
@@ -701,11 +672,11 @@ function renderDashboardOverview() {
   renderRecentActivity(memberships);
 }
 
-/* RECENT ACTIVITY */
+/* =========================================================
+   RECENT ACTIVITY
+   ========================================================= */
 
-function renderRecentActivity(
-  memberships = []
-) {
+function renderRecentActivity(memberships = []) {
   const container = $("#recentActivity");
 
   if (!container) return;
@@ -725,19 +696,14 @@ function renderRecentActivity(
   const sorted = [...memberships]
     .sort(
       (a, b) =>
-        new Date(
-          b.updatedAt || b.createdAt || 0
-        ) -
-        new Date(
-          a.updatedAt || a.createdAt || 0
-        )
+        new Date(b.updatedAt || b.createdAt || 0) -
+        new Date(a.updatedAt || a.createdAt || 0)
     )
     .slice(0, 5);
 
   container.innerHTML = sorted
     .map(membership => {
-      const circle =
-        membership.circle || {};
+      const circle = membership.circle || {};
 
       return `
         <div class="transaction-row">
@@ -746,17 +712,13 @@ function renderRecentActivity(
           <div class="transaction-info">
             <strong>
               ${escapeHTML(
-                circle.name ||
-                circle.code ||
-                "Savings Circle"
+                circle.name || circle.code || "Savings Circle"
               )}
             </strong>
 
             <span>
               ${escapeHTML(
-                getStatusLabel(
-                  membership.status
-                )
+                getStatusLabel(membership.status)
               )}
             </span>
           </div>
@@ -770,41 +732,30 @@ function renderRecentActivity(
     .join("");
 }
 
-/* ACCOUNT NAVIGATION */
+/* =========================================================
+   ACCOUNT NAVIGATION
+   ========================================================= */
 
-function activateAccountPanel(
-  panelName
-) {
-  const panels =
-    $$("[data-account-panel]");
-
-  panels.forEach(button => {
+function activateAccountPanel(panelName) {
+  $$("[data-account-panel]").forEach(button => {
     button.classList.toggle(
       "active",
-      button.dataset.accountPanel ===
-        panelName
+      button.dataset.accountPanel === panelName
     );
   });
 
-  const sections =
-    $$(".account-panel");
-
-  sections.forEach(section => {
-    section.hidden =
-      section.dataset.panel !==
-      panelName;
+  $$(".account-panel").forEach(section => {
+    section.hidden = section.dataset.panel !== panelName;
   });
 
-  const title =
-    $("#accountPanelTitle");
+  const title = $("#accountPanelTitle");
 
   const titles = {
     overview: "My Account",
     circles: "My Savings Circles",
     contributions: "Contributions",
     payouts: "Payouts",
-    "payment-methods":
-      "Payment Methods",
+    "payment-methods": "Payment Methods",
     profile: "Profile",
     settings: "Account Settings",
     security: "Security",
@@ -812,13 +763,10 @@ function activateAccountPanel(
   };
 
   if (title) {
-    title.textContent =
-      titles[panelName] ||
-      "My Account";
+    title.textContent = titles[panelName] || "My Account";
   }
 
-  const main =
-    $("#accountMain");
+  const main = $("#accountMain");
 
   if (main) {
     try {
@@ -838,72 +786,52 @@ function activateAccountPanel(
     renderPayouts();
   }
 
-  if (
-    panelName ===
-    "payment-methods"
-  ) {
+  if (panelName === "payment-methods") {
     renderPaymentMethods();
+  }
+
+  if (panelName === "profile") {
+    renderProfile();
   }
 }
 
 function bindAccountNavigation() {
-  $$("[data-account-panel]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        event => {
-          event.preventDefault();
+  $$("[data-account-panel]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
 
-          activateAccountPanel(
-            button.dataset.accountPanel
-          );
+      activateAccountPanel(button.dataset.accountPanel);
 
-          $$(".account-sidebar")
-            .forEach(sidebar => {
-              sidebar.classList.remove(
-                "open"
-              );
-            });
-        }
-      );
+      $$(".account-sidebar").forEach(sidebar => {
+        sidebar.classList.remove("open");
+      });
     });
+  });
 
-  $$("[data-account-home]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        event => {
-          event.preventDefault();
-          activateAccountPanel(
-            "overview"
-          );
-        }
-      );
+  $$("[data-account-home]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      activateAccountPanel("overview");
     });
+  });
 
-  $$("[data-mobile-menu]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        () => {
-          const sidebar =
-            $(".account-sidebar");
+  $$("[data-mobile-menu]").forEach(button => {
+    button.addEventListener("click", () => {
+      const sidebar = $(".account-sidebar");
 
-          if (sidebar) {
-            sidebar.classList.toggle(
-              "open"
-            );
-          }
-        }
-      );
+      if (sidebar) {
+        sidebar.classList.toggle("open");
+      }
     });
+  });
 }
 
-/* CIRCLES */
+/* =========================================================
+   CIRCLES
+   ========================================================= */
 
 async function loadDashboardCircles() {
-  const container =
-    $("#dashboardCircles");
+  const container = $("#dashboardCircles");
 
   if (!container) return;
 
@@ -915,8 +843,7 @@ async function loadDashboardCircles() {
   `;
 
   try {
-    const circles =
-      await api("/circles");
+    const circles = await api("/circles");
 
     renderCircles(circles);
   } catch (error) {
@@ -924,24 +851,18 @@ async function loadDashboardCircles() {
       <div class="empty-state">
         <div class="empty-icon">!</div>
         <h3>Unable to load circles</h3>
-        <p>${escapeHTML(
-          error.message
-        )}</p>
+        <p>${escapeHTML(error.message)}</p>
       </div>
     `;
   }
 }
 
-function renderCircles(
-  circles = []
-) {
-  const container =
-    $("#dashboardCircles");
+function renderCircles(circles = []) {
+  const container = $("#dashboardCircles");
 
   if (!container) return;
 
-  if (!Array.isArray(circles) ||
-      !circles.length) {
+  if (!Array.isArray(circles) || !circles.length) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">◎</div>
@@ -955,74 +876,47 @@ function renderCircles(
 
   container.innerHTML = circles
     .map(circle => {
-      const count =
-        Number(
-          circle._count?.memberships || 0
-        );
-
-      const capacity =
-        Number(circle.capacity || 0);
+      const count = Number(circle._count?.memberships || 0);
+      const capacity = Number(circle.capacity || 0);
 
       const progress =
         capacity > 0
-          ? Math.min(
-              100,
-              Math.round(
-                (count / capacity) * 100
-              )
-            )
+          ? Math.min(100, Math.round((count / capacity) * 100))
           : 0;
 
       return `
         <article class="dashboard-circle-card">
           <div class="circle-meta">
             <span class="circle-type">
-              ${escapeHTML(
-                getTypeLabel(
-                  circle.type
-                )
-              )}
+              ${escapeHTML(getTypeLabel(circle.type))}
             </span>
 
             <span class="circle-status ${getStatusClass(
               circle.status
             )}">
-              ${escapeHTML(
-                getStatusLabel(
-                  circle.status
-                )
-              )}
+              ${escapeHTML(getStatusLabel(circle.status))}
             </span>
           </div>
 
           <h3>
             ${escapeHTML(
-              circle.name ||
-              "PayaCircle Savings Circle"
+              circle.name || "PayaCircle Savings Circle"
             )}
           </h3>
 
           <p class="circle-code">
             Circle code:
-            ${escapeHTML(
-              circle.code || ""
-            )}
+            ${escapeHTML(circle.code || "")}
           </p>
 
           <div class="circle-detail">
             <span>Contribution</span>
-            <strong>
-              ${money(
-                circle.amountCents
-              )}
-            </strong>
+            <strong>${money(circle.amountCents)}</strong>
           </div>
 
           <div class="circle-detail">
             <span>Members</span>
-            <strong>
-              ${count} / ${capacity}
-            </strong>
+            <strong>${count} / ${capacity}</strong>
           </div>
 
           <div class="circle-progress">
@@ -1039,9 +933,7 @@ function renderCircles(
           <button
             class="circle-choose-button"
             type="button"
-            data-choose-circle="${escapeHTML(
-              circle.id
-            )}"
+            data-choose-circle="${escapeHTML(circle.id)}"
           >
             View Circle
           </button>
@@ -1050,86 +942,51 @@ function renderCircles(
     })
     .join("");
 
-  $$("[data-choose-circle]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        () => {
-          openCircleDetails(
-            button.dataset.chooseCircle
-          );
-        }
-      );
+  $$("[data-choose-circle]").forEach(button => {
+    button.addEventListener("click", () => {
+      openCircleDetails(button.dataset.chooseCircle);
     });
+  });
 }
 
-async function openCircleDetails(
-  circleId
-) {
+async function openCircleDetails(circleId) {
   try {
-    const circles =
-      await api("/circles");
+    const circles = await api("/circles");
 
-    const circle =
-      Array.isArray(circles)
-        ? circles.find(
-            item =>
-              item.id === circleId
-          )
-        : null;
+    const circle = Array.isArray(circles)
+      ? circles.find(item => item.id === circleId)
+      : null;
 
     if (!circle) {
-      showToast(
-        "Circle could not be found.",
-        "error"
-      );
+      showToast("Circle could not be found.", "error");
       return;
     }
 
     currentCircle = circle;
 
-    await showCircleSelection(
-      circle
-    );
+    await showCircleSelection(circle);
   } catch (error) {
-    showToast(
-      error.message,
-      "error"
-    );
+    showToast(error.message, "error");
   }
 }
 
-async function showCircleSelection(
-  circle
-) {
-  const container =
-    $("#circleSelectionContent");
+async function showCircleSelection(circle) {
+  const container = $("#circleSelectionContent");
 
   if (!container) {
-    activateAccountPanel(
-      "circles"
-    );
+    activateAccountPanel("circles");
     return;
   }
 
   container.innerHTML = `
     <div class="payment-summary">
       <h3>
-        ${escapeHTML(
-          circle.name ||
-          "Savings Circle"
-        )}
+        ${escapeHTML(circle.name || "Savings Circle")}
       </h3>
 
       <p>
-        ${escapeHTML(
-          getTypeLabel(
-            circle.type
-          )
-        )}
-        · ${money(
-          circle.amountCents
-        )}
+        ${escapeHTML(getTypeLabel(circle.type))}
+        · ${money(circle.amountCents)}
         contribution
       </p>
     </div>
@@ -1144,52 +1001,34 @@ async function showCircleSelection(
     </div>
   `;
 
-  activateAccountPanel(
-    "circles"
-  );
+  activateAccountPanel("circles");
 
   try {
-    const dates =
-      await api(
-        `/circles/${encodeURIComponent(
-          circle.id
-        )}/dates`
-      );
-
-    renderCircleDates(
-      circle,
-      dates
+    const dates = await api(
+      `/circles/${encodeURIComponent(circle.id)}/dates`
     );
+
+    renderCircleDates(circle, dates);
   } catch (error) {
-    const datesContainer =
-      $("#circleDateOptions");
+    const datesContainer = $("#circleDateOptions");
 
     if (datesContainer) {
       datesContainer.innerHTML = `
         <div class="empty-state">
           <h3>Payout dates are not available yet</h3>
-          <p>${escapeHTML(
-            error.message
-          )}</p>
+          <p>${escapeHTML(error.message)}</p>
         </div>
       `;
     }
   }
 }
 
-function renderCircleDates(
-  circle,
-  dates = []
-) {
-  const container =
-    $("#circleDateOptions");
+function renderCircleDates(circle, dates = []) {
+  const container = $("#circleDateOptions");
 
   if (!container) return;
 
-  if (
-    !Array.isArray(dates) ||
-    !dates.length
-  ) {
+  if (!Array.isArray(dates) || !dates.length) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">◷</div>
@@ -1206,51 +1045,31 @@ function renderCircleDates(
       ${dates
         .map(date => {
           const available =
-            Number(
-              date.reserved || 0
-            ) <
-            Number(
-              date.capacity || 0
-            );
+            Number(date.reserved || 0) <
+            Number(date.capacity || 0);
 
           return `
             <label class="circle-date-option ${
-              available
-                ? ""
-                : "disabled"
+              available ? "" : "disabled"
             }">
               <input
                 type="radio"
                 name="payoutDate"
-                value="${escapeHTML(
-                  date.id
-                )}"
-                ${
-                  available
-                    ? ""
-                    : "disabled"
-                }
+                value="${escapeHTML(date.id)}"
+                ${available ? "" : "disabled"}
               >
 
               <span class="circle-date-content">
                 <strong>
-                  ${escapeHTML(
-                    formatDate(
-                      date.payoutAt
-                    )
-                  )}
+                  ${escapeHTML(formatDate(date.payoutAt))}
                 </strong>
 
                 <small>
                   ${
                     available
                       ? `${
-                          Number(
-                            date.capacity
-                          ) -
-                          Number(
-                            date.reserved
-                          )
+                          Number(date.capacity) -
+                          Number(date.reserved)
                         } spot(s) available`
                       : "Fully reserved"
                   }
@@ -1271,83 +1090,55 @@ function renderCircleDates(
     </button>
   `;
 
-  const reserveButton =
-    $("#reserveCircleButton");
+  const reserveButton = $("#reserveCircleButton");
 
   if (reserveButton) {
-    reserveButton.addEventListener(
-      "click",
-      () => {
-        const selected =
-          $('input[name="payoutDate"]:checked');
+    reserveButton.addEventListener("click", () => {
+      const selected = $('input[name="payoutDate"]:checked');
 
-        if (!selected) {
-          showToast(
-            "Please select a payout date.",
-            "error"
-          );
-          return;
-        }
-
-        const selectedDate =
-          dates.find(
-            date =>
-              date.id ===
-              selected.value
-          );
-
-        if (!selectedDate) {
-          showToast(
-            "The selected payout date is no longer available.",
-            "error"
-          );
-          return;
-        }
-
-        currentPayoutDate =
-          selectedDate;
-
-        reserveMembership(
-          circle,
-          selectedDate
-        );
+      if (!selected) {
+        showToast("Please select a payout date.", "error");
+        return;
       }
-    );
+
+      const selectedDate = dates.find(
+        date => date.id === selected.value
+      );
+
+      if (!selectedDate) {
+        showToast(
+          "The selected payout date is no longer available.",
+          "error"
+        );
+        return;
+      }
+
+      currentPayoutDate = selectedDate;
+
+      reserveMembership(circle, selectedDate);
+    });
   }
 }
 
-/* MEMBERSHIP */
+/* =========================================================
+   MEMBERSHIP
+   ========================================================= */
 
-async function reserveMembership(
-  circle,
-  payoutDate
-) {
-  const button =
-    $("#reserveCircleButton");
+async function reserveMembership(circle, payoutDate) {
+  const button = $("#reserveCircleButton");
 
-  setLoading(
-    button,
-    true,
-    "Reserving..."
-  );
+  setLoading(button, true, "Reserving...");
 
   try {
-    const membership =
-      await api(
-        "/memberships",
-        {
-          method: "POST",
-          body: {
-            circleId:
-              circle.id,
-            payoutDateId:
-              payoutDate.id
-          }
-        }
-      );
+    const membership = await api("/memberships", {
+      method: "POST",
+      body: {
+        circleId: circle.id,
+        payoutDateId: payoutDate.id
+      }
+    });
 
-    currentMembership =
-      membership;
+    currentMembership = membership;
 
     showToast(
       "Your payout position has been reserved.",
@@ -1362,32 +1153,24 @@ async function reserveMembership(
       payoutDate
     );
   } catch (error) {
-    showToast(
-      error.message,
-      "error"
-    );
+    showToast(error.message, "error");
   } finally {
-    setLoading(
-      button,
-      false
-    );
+    setLoading(button, false);
   }
 }
 
-/* MEMBERSHIPS */
+/* =========================================================
+   MEMBERSHIPS
+   ========================================================= */
 
 function renderMemberships() {
-  const container =
-    $("#membershipList");
+  const container = $("#membershipList");
 
   if (!container) return;
 
-  const memberships =
-    Array.isArray(
-      currentUser?.memberships
-    )
-      ? currentUser.memberships
-      : [];
+  const memberships = Array.isArray(currentUser?.memberships)
+    ? currentUser.memberships
+    : [];
 
   if (!memberships.length) {
     container.innerHTML = `
@@ -1406,99 +1189,71 @@ function renderMemberships() {
       </div>
     `;
 
-    $$("[data-go-circles]")
-      .forEach(button => {
-        button.addEventListener(
-          "click",
-          () => {
-            activateAccountPanel(
-              "circles"
-            );
-          }
-        );
+    $$("[data-go-circles]").forEach(button => {
+      button.addEventListener("click", () => {
+        activateAccountPanel("circles");
       });
+    });
 
     return;
   }
 
-  container.innerHTML =
-    memberships
-      .map(membership => {
-        const circle =
-          membership.circle ||
-          {};
+  container.innerHTML = memberships
+    .map(membership => {
+      const circle = membership.circle || {};
+      const date = membership.payoutDate || {};
 
-        const date =
-          membership.payoutDate ||
-          {};
+      return `
+        <div class="membership-row">
+          <div class="membership-icon">◎</div>
 
-        return `
-          <div class="membership-row">
-            <div class="membership-icon">
-              ◎
-            </div>
-
-            <div class="membership-main">
-              <div class="membership-info">
-                <strong>
-                  ${escapeHTML(
-                    circle.name ||
-                    circle.code ||
-                    "Savings Circle"
-                  )}
-                </strong>
-
-                <span>
-                  ${escapeHTML(
-                    getTypeLabel(
-                      circle.type
-                    )
-                  )}
-                  · ${money(
-                    circle.amountCents
-                  )}
-                </span>
-
-                <small>
-                  Payout:
-                  ${escapeHTML(
-                    formatDate(
-                      date.payoutAt
-                    )
-                  )}
-                </small>
-              </div>
-
-              <span class="status-badge ${getStatusClass(
-                membership.status
-              )}">
+          <div class="membership-main">
+            <div class="membership-info">
+              <strong>
                 ${escapeHTML(
-                  getStatusLabel(
-                    membership.status
-                  )
+                  circle.name ||
+                  circle.code ||
+                  "Savings Circle"
                 )}
+              </strong>
+
+              <span>
+                ${escapeHTML(getTypeLabel(circle.type))}
+                · ${money(circle.amountCents)}
               </span>
+
+              <small>
+                Payout:
+                ${escapeHTML(formatDate(date.payoutAt))}
+              </small>
             </div>
+
+            <span class="status-badge ${getStatusClass(
+              membership.status
+            )}">
+              ${escapeHTML(
+                getStatusLabel(membership.status)
+              )}
+            </span>
           </div>
-        `;
-      })
-      .join("");
+        </div>
+      `;
+    })
+    .join("");
 }
 
-/* TRANSACTIONS */
+/* =========================================================
+   TRANSACTIONS
+   ========================================================= */
 
 function renderTransactions() {
-  const container =
-    $("#contributionTransactions");
+  const container = $("#contributionTransactions");
 
   if (!container) return;
 
-  const memberships =
-    Array.isArray(
-      currentUser?.memberships
-    )
-      ? currentUser.memberships
-      : [];
+  const memberships = Array.isArray(currentUser?.memberships)
+    ? currentUser.memberships
+    : [];
 
   if (!memberships.length) {
     container.innerHTML = `
@@ -1514,52 +1269,37 @@ function renderTransactions() {
 
   const rows = [];
 
-  memberships.forEach(
-    membership => {
-      const circle =
-        membership.circle ||
-        {};
+  memberships.forEach(membership => {
+    const circle = membership.circle || {};
 
-      const payments =
-        Array.isArray(
-          membership.payments
-        )
-          ? membership.payments
-          : [];
+    const payments = Array.isArray(membership.payments)
+      ? membership.payments
+      : [];
 
-      if (payments.length) {
-        payments.forEach(
-          payment => {
-            rows.push({
-              date:
-                payment.createdAt,
-              title:
-                circle.name ||
-                circle.code ||
-                "Savings Circle",
-              status:
-                payment.status,
-              amount:
-                payment.amountCents
-            });
-          }
-        );
-      } else {
+    if (payments.length) {
+      payments.forEach(payment => {
         rows.push({
-          date:
-            membership.createdAt,
+          date: payment.createdAt,
           title:
             circle.name ||
             circle.code ||
             "Savings Circle",
-          status:
-            membership.status,
-          amount:
-            circle.amountCents
+          status: payment.status,
+          amount: payment.amountCents
         });
-      }
+      });
+    } else {
+      rows.push({
+        date: membership.createdAt,
+        title:
+          circle.name ||
+          circle.code ||
+          "Savings Circle",
+        status: membership.status,
+        amount: circle.amountCents
+      });
     }
-  );
+  });
 
   rows.sort(
     (a, b) =>
@@ -1567,78 +1307,57 @@ function renderTransactions() {
       new Date(a.date || 0)
   );
 
-  container.innerHTML =
-    rows
-      .map(transaction => {
-        return `
-          <div class="transaction-row">
-            <div class="transaction-icon">
-              ↗
-            </div>
+  container.innerHTML = rows
+    .map(transaction => {
+      return `
+        <div class="transaction-row">
+          <div class="transaction-icon">↗</div>
 
-            <div class="transaction-info">
-              <strong>
-                ${escapeHTML(
-                  transaction.title
-                )}
-              </strong>
+          <div class="transaction-info">
+            <strong>
+              ${escapeHTML(transaction.title)}
+            </strong>
 
-              <span>
-                ${escapeHTML(
-                  getStatusLabel(
-                    transaction.status
-                  )
-                )}
-                ·
-                ${escapeHTML(
-                  formatDate(
-                    transaction.date
-                  )
-                )}
-              </span>
-            </div>
-
-            <div class="transaction-amount">
-              ${money(
-                transaction.amount
+            <span>
+              ${escapeHTML(
+                getStatusLabel(transaction.status)
               )}
-            </div>
+              ·
+              ${escapeHTML(
+                formatDate(transaction.date)
+              )}
+            </span>
           </div>
-        `;
-      })
-      .join("");
+
+          <div class="transaction-amount">
+            ${money(transaction.amount)}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
 }
 
-/* PAYOUTS */
+/* =========================================================
+   PAYOUTS
+   ========================================================= */
 
 function renderPayouts() {
-  const container =
-    $("#payoutTimeline");
+  const container = $("#payoutTimeline");
 
   if (!container) return;
 
-  const memberships =
-    Array.isArray(
-      currentUser?.memberships
-    )
-      ? currentUser.memberships
-      : [];
+  const memberships = Array.isArray(currentUser?.memberships)
+    ? currentUser.memberships
+    : [];
 
-  const payoutItems =
-    memberships
-      .filter(
-        membership =>
-          membership.payoutDate
-      )
-      .sort(
-        (a, b) =>
-          new Date(
-            a.payoutDate.payoutAt
-          ) -
-          new Date(
-            b.payoutDate.payoutAt
-          )
-      );
+  const payoutItems = memberships
+    .filter(membership => membership.payoutDate)
+    .sort(
+      (a, b) =>
+        new Date(a.payoutDate.payoutAt) -
+        new Date(b.payoutDate.payoutAt)
+    );
 
   if (!payoutItems.length) {
     container.innerHTML = `
@@ -1652,71 +1371,57 @@ function renderPayouts() {
     return;
   }
 
-  container.innerHTML =
-    payoutItems
-      .map(membership => {
-        const circle =
-          membership.circle ||
-          {};
+  container.innerHTML = payoutItems
+    .map(membership => {
+      const circle = membership.circle || {};
+      const payout = membership.payout;
+      const date = membership.payoutDate;
 
-        const payout =
-          membership.payout;
+      const status =
+        payout?.status ||
+        membership.status ||
+        "SCHEDULED";
 
-        const date =
-          membership.payoutDate;
+      return `
+        <div class="payout-item">
+          <div class="payout-dot"></div>
 
-        const status =
-          payout?.status ||
-          membership.status ||
-          "SCHEDULED";
-
-        return `
-          <div class="payout-item">
-            <div class="payout-dot"></div>
-
-            <div class="payout-info">
-              <strong>
-                ${escapeHTML(
-                  circle.name ||
-                  circle.code ||
-                  "Savings Circle"
-                )}
-              </strong>
-
-              <span>
-                ${escapeHTML(
-                  formatDate(
-                    date.payoutAt
-                  )
-                )}
-              </span>
-
-              <small>
-                ${escapeHTML(
-                  getStatusLabel(
-                    status
-                  )
-                )}
-              </small>
-            </div>
-
-            <div class="payout-value">
-              ${money(
-                payout?.amountCents ||
-                circle.amountCents
+          <div class="payout-info">
+            <strong>
+              ${escapeHTML(
+                circle.name ||
+                circle.code ||
+                "Savings Circle"
               )}
-            </div>
+            </strong>
+
+            <span>
+              ${escapeHTML(formatDate(date.payoutAt))}
+            </span>
+
+            <small>
+              ${escapeHTML(getStatusLabel(status))}
+            </small>
           </div>
-        `;
-      })
-      .join("");
+
+          <div class="payout-value">
+            ${money(
+              payout?.amountCents ||
+              circle.amountCents
+            )}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
 }
 
-/* PAYMENT METHODS */
+/* =========================================================
+   PAYMENT METHODS
+   ========================================================= */
 
 function renderPaymentMethods() {
-  const container =
-    $("#paymentMethodList");
+  const container = $("#paymentMethodList");
 
   if (!container) return;
 
@@ -1737,28 +1442,23 @@ function renderPaymentMethods() {
   `;
 }
 
-/* PROFILE */
+/* =========================================================
+   PROFILE
+   ========================================================= */
 
 function renderProfile() {
   if (!currentUser) return;
 
-  const name =
-    $("#profileName");
-
-  const email =
-    $("#profileEmail");
-
-  const paypalEmail =
-    $("#profilePaypalEmail");
+  const name = $("#profileName");
+  const email = $("#profileEmail");
+  const paypalEmail = $("#profilePaypalEmail");
 
   if (name) {
-    name.value =
-      currentUser.name || "";
+    name.value = currentUser.name || "";
   }
 
   if (email) {
-    email.value =
-      currentUser.email || "";
+    email.value = currentUser.email || "";
   }
 
   if (paypalEmail) {
@@ -1767,7 +1467,9 @@ function renderProfile() {
   }
 }
 
-/* PAYPAL */
+/* =========================================================
+   PAYPAL
+   ========================================================= */
 
 async function openPaymentPanel(
   membershipId,
@@ -1780,27 +1482,18 @@ async function openPaymentPanel(
   };
 
   currentCircle = circle;
-  currentPayoutDate =
-    payoutDate;
+  currentPayoutDate = payoutDate;
 
-  const panel =
-    $("#paymentPanel");
+  const panel = $("#paymentPanel");
 
   if (!panel) {
-    activateAccountPanel(
-      "payment-methods"
-    );
+    activateAccountPanel("payment-methods");
     return;
   }
 
-  const title =
-    $("#paymentCircleName");
-
-  const amount =
-    $("#paymentAmount");
-
-  const date =
-    $("#paymentPayoutDate");
+  const title = $("#paymentCircleName");
+  const amount = $("#paymentAmount");
+  const date = $("#paymentPayoutDate");
 
   if (title) {
     title.textContent =
@@ -1816,38 +1509,27 @@ async function openPaymentPanel(
 
   if (date) {
     date.textContent =
-      formatDate(
-        payoutDate.payoutAt
-      );
+      formatDate(payoutDate.payoutAt);
   }
 
-  activateAccountPanel(
-    "payment-methods"
-  );
+  activateAccountPanel("payment-methods");
 
   panel.hidden = false;
 
-  const payButton =
-    $("#paypalPayButton");
+  const payButton = $("#paypalPayButton");
 
   if (payButton) {
     payButton.disabled = false;
     payButton.textContent =
       "Continue with PayPal";
 
-    payButton.onclick =
-      () =>
-        beginPayPalPayment(
-          membershipId
-        );
+    payButton.onclick = () =>
+      beginPayPalPayment(membershipId);
   }
 }
 
-async function beginPayPalPayment(
-  membershipId
-) {
-  const button =
-    $("#paypalPayButton");
+async function beginPayPalPayment(membershipId) {
+  const button = $("#paypalPayButton");
 
   setLoading(
     button,
@@ -1856,16 +1538,15 @@ async function beginPayPalPayment(
   );
 
   try {
-    const data =
-      await api(
-        "/paypal/create-order",
-        {
-          method: "POST",
-          body: {
-            membershipId
-          }
+    const data = await api(
+      "/paypal/create-order",
+      {
+        method: "POST",
+        body: {
+          membershipId
         }
-      );
+      }
+    );
 
     if (!data.approvalUrl) {
       throw new Error(
@@ -1893,7 +1574,9 @@ async function beginPayPalPayment(
   }
 }
 
-/* PAYPAL RETURN */
+/* =========================================================
+   PAYPAL RETURN
+   ========================================================= */
 
 async function handlePayPalReturn() {
   if (paypalReturnHandled) {
@@ -1920,9 +1603,7 @@ async function handlePayPalReturn() {
 
   paypalReturnHandled = true;
 
-  if (
-    paypalStatus === "cancel"
-  ) {
+  if (paypalStatus === "cancel") {
     showToast(
       "PayPal payment was cancelled.",
       "info"
@@ -2002,13 +1683,14 @@ async function handlePayPalReturn() {
   }
 }
 
-/* CREATE CIRCLE */
+/* =========================================================
+   CREATE CIRCLE
+   ========================================================= */
 
 async function createCircle(event) {
   event.preventDefault();
 
-  const form =
-    event.currentTarget;
+  const form = event.currentTarget;
 
   const button =
     form.querySelector(
@@ -2044,10 +1726,9 @@ async function createCircle(event) {
   if (
     !name ||
     !type ||
-    !Number.isInteger(
-      capacity
-    ) ||
-    !amountUsd ||
+    !Number.isInteger(capacity) ||
+    capacity <= 0 ||
+    !Number.isFinite(amountUsd) ||
     amountUsd <= 0
   ) {
     showToast(
@@ -2099,7 +1780,9 @@ async function createCircle(event) {
   }
 }
 
-/* PUBLIC CIRCLES */
+/* =========================================================
+   PUBLIC CIRCLES
+   ========================================================= */
 
 async function loadPublicCircles() {
   const container =
@@ -2133,17 +1816,14 @@ async function loadPublicCircles() {
         .map(circle => {
           const count =
             Number(
-              circle._count
-                ?.memberships || 0
+              circle._count?.memberships || 0
             );
 
           return `
             <article class="circle-card">
               <span class="circle-type">
                 ${escapeHTML(
-                  getTypeLabel(
-                    circle.type
-                  )
+                  getTypeLabel(circle.type)
                 )}
               </span>
 
@@ -2155,9 +1835,7 @@ async function loadPublicCircles() {
               </h3>
 
               <p>
-                ${money(
-                  circle.amountCents
-                )}
+                ${money(circle.amountCents)}
                 contribution
               </p>
 
@@ -2172,57 +1850,60 @@ async function loadPublicCircles() {
           `;
         })
         .join("");
-  } catch (_) {}
+  } catch (error) {
+    console.error(
+      "Public circles error:",
+      error
+    );
+  }
 }
 
-/* PUBLIC NAVIGATION */
+/* =========================================================
+   PUBLIC NAVIGATION
+   ========================================================= */
 
 function bindPublicNavigation() {
-  $$("a[href^='#']")
-    .forEach(link => {
-      link.addEventListener(
-        "click",
-        event => {
-          const targetId =
-            link.getAttribute(
-              "href"
-            );
+  $$("a[href^='#']").forEach(link => {
+    link.addEventListener("click", event => {
+      const targetId =
+        link.getAttribute("href");
 
-          if (
-            !targetId ||
-            targetId === "#" ||
-            document.body.classList.contains(
-              "dashboard-active"
-            )
-          ) {
-            return;
-          }
+      if (
+        !targetId ||
+        targetId === "#" ||
+        document.body.classList.contains(
+          "dashboard-active"
+        )
+      ) {
+        return;
+      }
 
-          let target = null;
+      let target = null;
 
-          try {
-            target =
-              document.querySelector(
-                targetId
-              );
-          } catch (_) {
-            return;
-          }
+      try {
+        target =
+          document.querySelector(
+            targetId
+          );
+      } catch (_) {
+        return;
+      }
 
-          if (!target) return;
+      if (!target) return;
 
-          event.preventDefault();
+      event.preventDefault();
 
-          target.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-          });
-        }
-      );
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
     });
+  });
 }
 
-/* MOBILE MENU */
+/* =========================================================
+   MOBILE PUBLIC MENU
+   ========================================================= */
 
 function bindMobileMenu() {
   const toggle =
@@ -2237,17 +1918,14 @@ function bindMobileMenu() {
     return;
   }
 
-  toggle.addEventListener(
-    "click",
-    () => {
-      menu.classList.toggle(
-        "open"
-      );
-    }
-  );
+  toggle.addEventListener("click", () => {
+    menu.classList.toggle("open");
+  });
 }
 
-/* FORMS */
+/* =========================================================
+   FORMS
+   ========================================================= */
 
 function bindForms() {
   const registerForm =
@@ -2300,81 +1978,86 @@ function bindForms() {
   }
 }
 
-/* LOGOUT */
+/* =========================================================
+   LOGOUT BUTTONS
+   ========================================================= */
 
 function bindLogoutButtons() {
-  $$("[data-logout]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        event => {
-          event.preventDefault();
-          logoutUser();
-        }
-      );
-    });
+  $$("[data-logout]").forEach(button => {
+    button.addEventListener(
+      "click",
+      event => {
+        event.preventDefault();
+        logoutUser();
+      }
+    );
+  });
 }
 
-/* GET STARTED */
+/* =========================================================
+   GET STARTED
+   ========================================================= */
 
 function bindGetStarted() {
-  $$("[data-get-started]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        event => {
-          event.preventDefault();
+  $$("[data-get-started]").forEach(button => {
+    button.addEventListener(
+      "click",
+      event => {
+        event.preventDefault();
 
-          if (currentUser) {
-            showDashboard();
-          } else {
-            openRegister();
-          }
+        if (currentUser) {
+          showDashboard();
+        } else {
+          openRegister();
         }
-      );
-    });
+      }
+    );
+  });
 }
 
-/* REFRESH */
+/* =========================================================
+   REFRESH
+   ========================================================= */
 
 function bindRefreshButtons() {
-  $$("[data-refresh-dashboard]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        async event => {
-          event.preventDefault();
+  $$("[data-refresh-dashboard]").forEach(button => {
+    button.addEventListener(
+      "click",
+      async event => {
+        event.preventDefault();
 
+        setLoading(
+          button,
+          true,
+          "Refreshing..."
+        );
+
+        try {
+          await refreshDashboard();
+
+          showToast(
+            "Account refreshed.",
+            "success"
+          );
+        } catch (error) {
+          showToast(
+            error.message,
+            "error"
+          );
+        } finally {
           setLoading(
             button,
-            true,
-            "Refreshing..."
+            false
           );
-
-          try {
-            await refreshDashboard();
-
-            showToast(
-              "Account refreshed.",
-              "success"
-            );
-          } catch (error) {
-            showToast(
-              error.message,
-              "error"
-            );
-          } finally {
-            setLoading(
-              button,
-              false
-            );
-          }
         }
-      );
-    });
+      }
+    );
+  });
 }
 
-/* INITIALIZATION */
+/* =========================================================
+   INITIALIZATION
+   ========================================================= */
 
 async function initializeApp() {
   try {
@@ -2393,6 +2076,7 @@ async function initializeApp() {
     if (user) {
       await showDashboard();
     } else {
+      hideDashboard();
       await loadPublicCircles();
     }
 
