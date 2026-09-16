@@ -1,842 +1,794 @@
 const API = "/api";
 
 let currentUser = null;
-let currentMembershipId = null;
+let currentMembership = null;
 let currentCircle = null;
-let currentDates = [];
-let dashboardData = null;
+let currentPayoutDate = null;
+let paypalReturnHandled = false;
 
-const $ = id => document.getElementById(id);
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
-    credentials: "same-origin",
+  const config = {
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
     },
     ...options
-  });
+  };
 
-  let data = {};
-
-  try {
-    data = await response.json();
-  } catch {
-    data = {};
+  if (config.body && typeof config.body !== "string") {
+    config.body = JSON.stringify(config.body);
   }
 
+  const response = await fetch(`${API}${path}`, config);
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_) {}
+
   if (!response.ok) {
-    throw new Error(data.error || "Something went wrong.");
+    const error = new Error(data.error || "Something went wrong.");
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;
 }
 
-function money(cents) {
-  return `$${(Number(cents || 0) / 100).toFixed(2)}`;
+function money(cents = 0) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD"
+  }).format(Number(cents || 0) / 100);
 }
 
 function formatDate(value) {
-  if (!value) return "—";
+  if (!value) return "Not scheduled";
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
+  if (Number.isNaN(date.getTime())) return "Not scheduled";
 
-  return date.toLocaleDateString(undefined, {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric"
-  });
+  }).format(date);
 }
 
 function formatDateTime(value) {
-  if (!value) return "—";
+  if (!value) return "Not scheduled";
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
+  if (Number.isNaN(date.getTime())) return "Not scheduled";
 
-  return date.toLocaleDateString(undefined, {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
-  });
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
 }
 
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function escapeHTML(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-function initials(name) {
-  const parts = String(name || "Member")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+function initials(name = "") {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
 
-  if (!parts.length) return "M";
+  if (!parts.length) return "PC";
 
   return parts
     .slice(0, 2)
-    .map(part => part[0].toUpperCase())
-    .join("");
+    .map(part => part[0])
+    .join("")
+    .toUpperCase();
 }
 
-/* =========================
-   MODAL
-========================= */
+function humanize(value = "") {
+  return String(value)
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, letter => letter.toUpperCase());
+}
 
-function showModal(content) {
-  const modal = $("modal");
+function getTypeLabel(type) {
+  const labels = {
+    FAMILY: "Family",
+    FRIENDS: "Friends",
+    SOCIAL_MEDIA: "Social Media",
+    CUSTOM: "Custom"
+  };
+
+  return labels[type] || "Circle";
+}
+
+function getStatusClass(status = "") {
+  return String(status).toLowerCase().replaceAll("_", "-");
+}
+
+function getStatusLabel(status = "") {
+  return humanize(status);
+}
+
+function showToast(message, type = "info") {
+  let toast = $("#pcToast");
+
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "pcToast";
+    toast.className = "pc-toast";
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.className = `pc-toast pc-toast-${type} pc-toast-show`;
+
+  clearTimeout(window.__pcToastTimer);
+
+  window.__pcToastTimer = setTimeout(() => {
+    toast.classList.remove("pc-toast-show");
+  }, 3500);
+}
+
+function setLoading(button, loading, loadingText = "Please wait...") {
+  if (!button) return;
+
+  if (loading) {
+    button.dataset.originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = loadingText;
+  } else {
+    button.disabled = false;
+
+    if (button.dataset.originalText) {
+      button.innerHTML = button.dataset.originalText;
+    }
+  }
+}
+
+/* ------------------------------
+   AUTH MODALS
+------------------------------ */
+
+function openModal(id) {
+  const modal = document.getElementById(id);
 
   if (!modal) return;
 
-  modal.innerHTML = `
-    <div class="modalbox">
-      <button class="x" id="modalClose" aria-label="Close">×</button>
-      ${content}
-    </div>
-  `;
-
-  modal.classList.add("show");
-
-  $("modalClose")?.addEventListener("click", hideModal);
+  modal.classList.add("active");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
 }
 
-function hideModal() {
-  const modal = $("modal");
+function closeModal(id) {
+  const modal = document.getElementById(id);
 
   if (!modal) return;
 
-  modal.classList.remove("show");
-  modal.innerHTML = "";
+  modal.classList.remove("active");
+  modal.setAttribute("aria-hidden", "true");
+
+  if (!$(".modal.active")) {
+    document.body.classList.remove("modal-open");
+  }
 }
 
-/* =========================
-   AUTH
-========================= */
+function closeAllModals() {
+  $$(".modal.active").forEach(modal => {
+    modal.classList.remove("active");
+    modal.setAttribute("aria-hidden", "true");
+  });
+
+  document.body.classList.remove("modal-open");
+}
+
+function switchAuth(mode) {
+  const loginForm = $("#loginForm");
+  const registerForm = $("#registerForm");
+  const loginTitle = $("#loginTitle");
+  const registerTitle = $("#registerTitle");
+
+  if (mode === "register") {
+    if (loginForm) loginForm.hidden = true;
+    if (registerForm) registerForm.hidden = false;
+    if (loginTitle) loginTitle.hidden = true;
+    if (registerTitle) registerTitle.hidden = false;
+  } else {
+    if (loginForm) loginForm.hidden = false;
+    if (registerForm) registerForm.hidden = true;
+    if (loginTitle) loginTitle.hidden = false;
+    if (registerTitle) registerTitle.hidden = true;
+  }
+}
+
+function openLogin() {
+  switchAuth("login");
+  openModal("authModal");
+}
+
+function openRegister() {
+  switchAuth("register");
+  openModal("authModal");
+}
+
+function bindAuthButtons() {
+  $$("[data-open-login]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      openLogin();
+    });
+  });
+
+  $$("[data-open-register]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      openRegister();
+    });
+  });
+
+  $$("[data-close-modal]").forEach(button => {
+    button.addEventListener("click", () => {
+      const modal = button.closest(".modal");
+      if (modal) closeModal(modal.id);
+    });
+  });
+
+  $$(".modal").forEach(modal => {
+    modal.addEventListener("click", event => {
+      if (event.target === modal) {
+        closeModal(modal.id);
+      }
+    });
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      closeAllModals();
+    }
+  });
+
+  const showLogin = $("#showLogin");
+  const showRegister = $("#showRegister");
+
+  if (showLogin) {
+    showLogin.addEventListener("click", event => {
+      event.preventDefault();
+      switchAuth("login");
+    });
+  }
+
+  if (showRegister) {
+    showRegister.addEventListener("click", event => {
+      event.preventDefault();
+      switchAuth("register");
+    });
+  }
+}
+
+/* ------------------------------
+   REGISTER
+------------------------------ */
 
 async function registerUser(event) {
   event.preventDefault();
 
   const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
 
   const name = form.querySelector('[name="name"]')?.value.trim();
   const email = form.querySelector('[name="email"]')?.value.trim();
   const password = form.querySelector('[name="password"]')?.value;
 
+  if (!name || !email || !password) {
+    showToast("Please complete all fields.", "error");
+    return;
+  }
+
+  setLoading(button, true, "Creating account...");
+
   try {
-    const result = await api("/register", {
+    const data = await api("/register", {
       method: "POST",
-      body: JSON.stringify({
+      body: {
         name,
         email,
         password
-      })
+      }
     });
 
-    currentUser = result;
+    currentUser = data;
 
-    hideModal();
+    closeAllModals();
+
+    showToast("Account created successfully.", "success");
 
     await showDashboard();
 
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
+  } finally {
+    setLoading(button, false);
   }
 }
+
+/* ------------------------------
+   LOGIN
+------------------------------ */
 
 async function loginUser(event) {
   event.preventDefault();
 
   const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
 
   const email = form.querySelector('[name="email"]')?.value.trim();
   const password = form.querySelector('[name="password"]')?.value;
 
+  if (!email || !password) {
+    showToast("Please enter your email and password.", "error");
+    return;
+  }
+
+  setLoading(button, true, "Signing in...");
+
   try {
-    const result = await api("/login", {
+    const data = await api("/login", {
       method: "POST",
-      body: JSON.stringify({
+      body: {
         email,
         password
-      })
+      }
     });
 
-    currentUser = result;
+    currentUser = data;
 
-    hideModal();
+    closeAllModals();
+
+    showToast("Signed in successfully.", "success");
 
     await showDashboard();
 
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
+  } finally {
+    setLoading(button, false);
   }
 }
+
+/* ------------------------------
+   LOGOUT
+------------------------------ */
 
 async function logoutUser() {
   try {
     await api("/logout", {
       method: "POST"
     });
-  } catch {
-    // Continue with local UI reset.
+  } catch (_) {
+    // Continue logging out locally even if the request fails.
   }
 
   currentUser = null;
-  dashboardData = null;
-  currentMembershipId = null;
+  currentMembership = null;
   currentCircle = null;
+  currentPayoutDate = null;
 
   hideDashboard();
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  showToast("You have been signed out.", "success");
 }
 
-/* =========================
-   AUTH MODALS
-========================= */
-
-function openLogin() {
-  showModal(`
-    <div class="eyebrow">MEMBER ACCOUNT</div>
-    <h2>Welcome back</h2>
-    <p>Sign in to manage your PayaCircle savings.</p>
-
-    <form id="loginForm">
-      <label>Email</label>
-      <input
-        name="email"
-        type="email"
-        autocomplete="email"
-        required
-        placeholder="you@example.com"
-      />
-
-      <label>Password</label>
-      <input
-        name="password"
-        type="password"
-        autocomplete="current-password"
-        required
-        placeholder="Your password"
-      />
-
-      <button class="primary" type="submit">
-        Sign in securely
-      </button>
-    </form>
-  `);
-
-  $("loginForm")?.addEventListener("submit", loginUser);
-}
-
-function openRegister() {
-  showModal(`
-    <div class="eyebrow">JOIN PAYACIRCLE</div>
-    <h2>Create your account</h2>
-    <p>Start managing your savings circles from one secure account.</p>
-
-    <form id="registerForm">
-      <label>Full name</label>
-      <input
-        name="name"
-        autocomplete="name"
-        required
-        minlength="2"
-        maxlength="80"
-        placeholder="Your full name"
-      />
-
-      <label>Email address</label>
-      <input
-        name="email"
-        type="email"
-        autocomplete="email"
-        required
-        placeholder="you@example.com"
-      />
-
-      <label>Password</label>
-      <input
-        name="password"
-        type="password"
-        autocomplete="new-password"
-        required
-        minlength="10"
-        placeholder="At least 10 characters"
-      />
-
-      <button class="primary" type="submit">
-        Create secure account
-      </button>
-    </form>
-  `);
-
-  $("registerForm")?.addEventListener("submit", registerUser);
-}
-
-/* =========================
-   PUBLIC CIRCLES
-========================= */
-
-async function loadPublicCircles() {
-  const container = $("circleCards");
-
-  if (!container) return;
-
-  try {
-    const circles = await api("/circles");
-
-    if (!Array.isArray(circles) || !circles.length) {
-      container.innerHTML = `
-        <div class="card">
-          <h3>No circles yet</h3>
-          <p>New savings circles will appear here.</p>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = circles.map(circle => {
-      const members = circle._count?.memberships || 0;
-
-      return `
-        <article class="card">
-          <div class="circle-meta">
-            <span class="circle-type">
-              ${escapeHTML(circle.type || "CUSTOM")}
-            </span>
-            <span class="circle-status">
-              ${members}/${circle.capacity}
-            </span>
-          </div>
-
-          <h3>${money(circle.amountCents)}</h3>
-
-          <p>
-            ${escapeHTML(circle.name || circle.code || "Savings Circle")}
-          </p>
-
-          <button
-            type="button"
-            class="public-circle-select"
-            data-circle-id="${escapeHTML(circle.id)}"
-          >
-            View circle
-          </button>
-        </article>
-      `;
-    }).join("");
-
-    container.querySelectorAll(".public-circle-select").forEach(button => {
-      button.addEventListener("click", async () => {
-        try {
-          await getCircleDates(button.dataset.circleId);
-        } catch (error) {
-          alert(error.message);
-        }
-      });
-    });
-
-  } catch (error) {
-    console.error("Public circles:", error);
-  }
-}
-
-/* =========================
-   DASHBOARD VISIBILITY
-========================= */
-
-function showDashboardContainer() {
-  const dashboard = $("dashboard");
-
-  if (dashboard) {
-    dashboard.style.display = "block";
-  }
-
-  document
-    .querySelectorAll("body > section:not(#dashboard)")
-    .forEach(section => {
-      if (
-        section.id !== "dashboard" &&
-        !section.classList.contains("modal")
-      ) {
-        section.dataset.publicHidden = section.style.display || "";
-        section.style.display = "none";
-      }
-    });
-
-  document
-    .querySelectorAll("body > header, body > .announcement, body > footer")
-    .forEach(element => {
-      element.dataset.publicHidden = element.style.display || "";
-      element.style.display = "none";
-    });
-}
+/* ------------------------------
+   PUBLIC SITE
+------------------------------ */
 
 function hideDashboard() {
-  const dashboard = $("dashboard");
+  const dashboard = $("#dashboard");
 
   if (dashboard) {
-    dashboard.style.display = "none";
+    dashboard.hidden = true;
+    dashboard.classList.remove("active");
   }
 
-  document
-    .querySelectorAll("[data-public-hidden]")
-    .forEach(element => {
-      element.style.display = element.dataset.publicHidden || "";
-      delete element.dataset.publicHidden;
-    });
+  $$("body > *").forEach(element => {
+    if (element.id !== "dashboard" && element.id !== "pcToast") {
+      element.hidden = false;
+    }
+  });
 
-  loadPublicCircles();
-
-  if (typeof setupPublicNavigation === "function") {
-    setupPublicNavigation();
-  }
+  document.body.classList.remove("dashboard-active");
 }
 
-/* =========================
-   DASHBOARD LOADING
-========================= */
+function showDashboardElements() {
+  $$("body > *").forEach(element => {
+    if (
+      element.id !== "dashboard" &&
+      element.id !== "pcToast"
+    ) {
+      element.hidden = true;
+    }
+  });
+
+  const dashboard = $("#dashboard");
+
+  if (dashboard) {
+    dashboard.hidden = false;
+    dashboard.classList.add("active");
+  }
+
+  document.body.classList.add("dashboard-active");
+}
 
 async function showDashboard() {
-  showDashboardContainer();
+  showDashboardElements();
 
+  await refreshDashboard();
+
+  activateAccountPanel("overview");
+}
+
+/* ------------------------------
+   CURRENT USER
+------------------------------ */
+
+async function loadCurrentUser() {
   try {
     const user = await api("/me");
 
     currentUser = user;
-    dashboardData = user;
 
-    renderDashboard(user);
-    setupAccountNavigation();
-    await loadDashboardCircles();
-
-    switchAccountPanel("overview");
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
+    return user;
 
   } catch (error) {
-    console.error("Dashboard:", error);
-
-    if (error.message === "Authentication required" ||
-        error.message === "Invalid session") {
-      hideDashboard();
-      return;
+    if (error.status === 401) {
+      currentUser = null;
     }
 
-    alert(error.message);
+    return null;
   }
 }
 
-/* =========================
-   DASHBOARD HEADER
-========================= */
+/* ------------------------------
+   DASHBOARD DATA
+------------------------------ */
 
-function renderDashboard(user) {
-  const name = escapeHTML(user?.name || "Member");
-  const email = escapeHTML(user?.email || "—");
+async function refreshDashboard() {
+  const user = await loadCurrentUser();
 
-  if ($("dashboardName")) {
-    $("dashboardName").textContent = name;
+  if (!user) {
+    hideDashboard();
+    return;
   }
 
-  if ($("dashboardEmail")) {
-    $("dashboardEmail").textContent = email;
-  }
+  currentUser = user;
 
-  if ($("dashboardUserName")) {
-    $("dashboardUserName").textContent = name;
-  }
+  renderUserHeader();
+  renderDashboardOverview();
+  renderMemberships();
+  renderTransactions();
+  renderPayouts();
+  renderProfile();
+}
 
-  if ($("dashboardUserEmail")) {
-    $("dashboardUserEmail").textContent = email;
-  }
+/* ------------------------------
+   USER HEADER
+------------------------------ */
 
-  document
-    .querySelectorAll(".dashboardUserInitials")
-    .forEach(element => {
-      element.textContent = initials(user?.name);
-    });
+function renderUserHeader() {
+  if (!currentUser) return;
 
-  const memberships = Array.isArray(user?.memberships)
-    ? user.memberships
+  const name = currentUser.name || "Member";
+  const email = currentUser.email || "";
+
+  const nameElements = [
+    "#dashboardUserName",
+    "#accountUserName",
+    "#profileName"
+  ];
+
+  nameElements.forEach(selector => {
+    const element = $(selector);
+
+    if (element) {
+      if (selector === "#profileName") {
+        element.value = name;
+      } else {
+        element.textContent = name;
+      }
+    }
+  });
+
+  const emailElements = [
+    "#dashboardUserEmail",
+    "#accountUserEmail",
+    "#profileEmail"
+  ];
+
+  emailElements.forEach(selector => {
+    const element = $(selector);
+
+    if (element) {
+      if (selector === "#profileEmail") {
+        element.value = email;
+      } else {
+        element.textContent = email;
+      }
+    }
+  });
+
+  $$(".dashboardUserInitials").forEach(element => {
+    element.textContent = initials(name);
+  });
+}
+
+/* ------------------------------
+   OVERVIEW
+------------------------------ */
+
+function renderDashboardOverview() {
+  if (!currentUser) return;
+
+  const memberships = Array.isArray(currentUser.memberships)
+    ? currentUser.memberships
     : [];
 
-  const activeMemberships = memberships.filter(
+  const paidMemberships = memberships.filter(
     membership =>
-      membership.status !== "CANCELLED" &&
-      membership.status !== "REFUNDED"
+      membership.status === "PAID" ||
+      membership.status === "PAYOUT_SCHEDULED" ||
+      membership.status === "PAID_OUT"
   );
 
-  const totalContributions = memberships.reduce((total, membership) => {
-    const payments = Array.isArray(membership.payments)
-      ? membership.payments
-      : [];
-
-    return total + payments
-      .filter(payment => payment.status === "CAPTURED")
-      .reduce(
-        (sum, payment) => sum + Number(payment.amountCents || 0),
-        0
-      );
-  }, 0);
-
-  const nextPayout = activeMemberships
-    .map(membership => membership.payoutDate?.payoutAt)
-    .filter(Boolean)
-    .sort(
-      (a, b) =>
-        new Date(a).getTime() - new Date(b).getTime()
-    )[0];
-
-  if ($("dashboardCircleCount")) {
-    $("dashboardCircleCount").textContent =
-      activeMemberships.length;
-  }
-
-  if ($("dashboardContributions")) {
-    $("dashboardContributions").textContent =
-      money(totalContributions);
-  }
-
-  if ($("dashboardNextPayout")) {
-    $("dashboardNextPayout").textContent =
-      formatDate(nextPayout);
-  }
-
-  renderBalanceCards(
-    activeMemberships,
-    totalContributions
-  );
-
-  renderMemberships(activeMemberships);
-  renderTransactions(memberships);
-  renderPayouts(activeMemberships);
-  renderProfile(user);
-}
-
-/* =========================
-   BALANCE / OVERVIEW
-========================= */
-
-function renderBalanceCards(memberships, totalContributions) {
-  const totalSavings = memberships.reduce(
-    (total, membership) => {
-      const payments = Array.isArray(membership.payments)
-        ? membership.payments
-        : [];
-
-      return total + payments
-        .filter(payment => payment.status === "CAPTURED")
-        .reduce(
-          (sum, payment) =>
-            sum + Number(payment.amountCents || 0),
-          0
-        );
-    },
-    0
-  );
-
-  const completedPayouts = memberships.reduce(
-    (total, membership) =>
-      total +
-      Number(membership.payout?.amountCents || 0),
-    0
-  );
-
-  const availableBalance =
-    Math.max(totalSavings - completedPayouts, 0);
-
-  const totalTarget = memberships.reduce(
+  const totalSavings = paidMemberships.reduce(
     (total, membership) =>
       total + Number(membership.circle?.amountCents || 0),
     0
   );
 
+  const completedPayouts = memberships.filter(
+    membership => membership.status === "PAID_OUT"
+  );
+
+  const payoutTotal = completedPayouts.reduce(
+    (total, membership) =>
+      total + Number(membership.circle?.amountCents || 0),
+    0
+  );
+
+  const activeContribution = memberships
+    .filter(membership => membership.status !== "CANCELLED")
+    .reduce(
+      (total, membership) =>
+        total + Number(membership.circle?.amountCents || 0),
+      0
+    );
+
+  const totalSavingsElement = $("#accountTotalSavings");
+
+  if (totalSavingsElement) {
+    totalSavingsElement.textContent = money(totalSavings);
+  }
+
+  const balanceElement = $("#accountAvailableBalance");
+
+  if (balanceElement) {
+    balanceElement.textContent = money(payoutTotal);
+  }
+
+  const contributionElement = $("#accountContributionTotal");
+
+  if (contributionElement) {
+    contributionElement.textContent = money(activeContribution);
+  }
+
+  const circlesElement = $("#accountCircleCount");
+
+  if (circlesElement) {
+    circlesElement.textContent = memberships.length;
+  }
+
+  const payoutElement = $("#accountPayoutTotal");
+
+  if (payoutElement) {
+    payoutElement.textContent = money(payoutTotal);
+  }
+
   const progress =
-    totalTarget > 0
+    memberships.length > 0
       ? Math.min(
           100,
-          Math.round(
-            (totalSavings / totalTarget) * 100
-          )
+          Math.round((paidMemberships.length / memberships.length) * 100)
         )
       : 0;
 
-  if ($("accountTotalSavings")) {
-    $("accountTotalSavings").textContent =
-      money(totalSavings);
+  const progressElement = $("#accountProgress");
+
+  if (progressElement) {
+    progressElement.textContent = `${progress}%`;
   }
 
-  if ($("accountAvailableBalance")) {
-    $("accountAvailableBalance").textContent =
-      money(availableBalance);
-  }
+  $$(".accountProgressBar").forEach(bar => {
+    bar.style.width = `${progress}%`;
+  });
 
-  if ($("accountProgress")) {
-    $("accountProgress").textContent =
-      `${progress}%`;
-  }
-
-  document
-    .querySelectorAll(".accountProgressBar")
-    .forEach(bar => {
-      bar.style.width = `${progress}%`;
-    });
+  renderRecentActivity(memberships);
 }
 
-/* =========================
+/* ------------------------------
+   RECENT ACTIVITY
+------------------------------ */
+
+function renderRecentActivity(memberships) {
+  const container = $("#recentActivity");
+
+  if (!container) return;
+
+  if (!memberships.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">○</div>
+        <h3>No activity yet</h3>
+        <p>Join your first savings circle to get started.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const sorted = [...memberships]
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt) -
+        new Date(a.updatedAt || a.createdAt)
+    )
+    .slice(0, 5);
+
+  container.innerHTML = sorted
+    .map(membership => {
+      const circle = membership.circle || {};
+
+      return `
+        <div class="transaction-row">
+          <div class="transaction-icon">◎</div>
+          <div class="transaction-info">
+            <strong>${escapeHTML(circle.name || circle.code || "Savings Circle")}</strong>
+            <span>${escapeHTML(getStatusLabel(membership.status))}</span>
+          </div>
+          <div class="transaction-amount">
+            ${money(circle.amountCents)}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+/* ------------------------------
    ACCOUNT NAVIGATION
-========================= */
+------------------------------ */
 
-function setupAccountNavigation() {
-  document
-    .querySelectorAll("[data-account-panel]")
-    .forEach(button => {
+function activateAccountPanel(panelName) {
+  const panels = $$("[data-account-panel]");
 
-      if (button.dataset.bound === "true") return;
+  panels.forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.accountPanel === panelName
+    );
+  });
 
-      button.dataset.bound = "true";
+  const sections = $$(".account-panel");
 
-      button.addEventListener("click", () => {
-        switchAccountPanel(
-          button.dataset.accountPanel
-        );
-      });
-    });
+  sections.forEach(section => {
+    section.hidden = section.dataset.panel !== panelName;
+  });
 
-  $("dashboardLogout")
-    ?.addEventListener("click", logoutUser);
-
-  $("dashboardCreateCircle")
-    ?.addEventListener("click", openCreateCircle);
-
-  $("cancelPayment")
-    ?.addEventListener("click", closePaymentPanel);
-
-  $("paypalButton")
-    ?.addEventListener("click", startPayPalPayment);
-}
-
-function switchAccountPanel(panel) {
-  const validPanels = [
-    "overview",
-    "circles",
-    "contributions",
-    "payouts",
-    "payment-methods",
-    "settings",
-    "security",
-    "help"
-  ];
-
-  if (!validPanels.includes(panel)) {
-    panel = "overview";
-  }
-
-  document
-    .querySelectorAll(".account-panel")
-    .forEach(section => {
-      section.classList.toggle(
-        "active",
-        section.dataset.panel === panel
-      );
-    });
-
-  document
-    .querySelectorAll("[data-account-panel]")
-    .forEach(button => {
-      button.classList.toggle(
-        "active",
-        button.dataset.accountPanel === panel
-      );
-    });
+  const title = $("#accountPanelTitle");
 
   const titles = {
-    overview: "Overview",
-    circles: "My Circles",
+    overview: "My Account",
+    circles: "My Savings Circles",
     contributions: "Contributions",
     payouts: "Payouts",
     "payment-methods": "Payment Methods",
-    settings: "Profile & Settings",
+    settings: "Account Settings",
     security: "Security",
     help: "Help & Support"
   };
 
-  const title = $("accountPanelTitle");
-
   if (title) {
-    title.textContent = titles[panel];
+    title.textContent = titles[panelName] || "My Account";
   }
 
-  const accountMain = $("accountMain");
+  const main = $("#accountMain");
 
-  if (accountMain) {
-    accountMain.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+  if (main) {
+    main.scrollTop = 0;
+  }
+
+  if (panelName === "circles") {
+    loadDashboardCircles();
+  }
+
+  if (panelName === "contributions") {
+    renderTransactions();
+  }
+
+  if (panelName === "payouts") {
+    renderPayouts();
+  }
+
+  if (panelName === "payment-methods") {
+    renderPaymentMethods();
   }
 }
 
-/* =========================
+function bindAccountNavigation() {
+  $$("[data-account-panel]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+
+      activateAccountPanel(
+        button.dataset.accountPanel
+      );
+
+      $$(".account-sidebar").forEach(sidebar => {
+        sidebar.classList.remove("open");
+      });
+    });
+  });
+
+  $$("[data-account-home]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      activateAccountPanel("overview");
+    });
+  });
+
+  $$("[data-mobile-menu]").forEach(button => {
+    button.addEventListener("click", () => {
+      const sidebar = $(".account-sidebar");
+
+      if (sidebar) {
+        sidebar.classList.toggle("open");
+      }
+    });
+  });
+}
+
+/* ------------------------------
    CIRCLES
-========================= */
+------------------------------ */
 
 async function loadDashboardCircles() {
-  const container = $("dashboardCircles");
+  const container = $("#dashboardCircles");
 
   if (!container) return;
+
+  container.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">...</div>
+      <p>Loading savings circles...</p>
+    </div>
+  `;
 
   try {
     const circles = await api("/circles");
 
-    if (!Array.isArray(circles) || !circles.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">◎</div>
-          <h3>No savings circles yet</h3>
-          <p>
-            Create your first circle or check back when
-            new circles become available.
-          </p>
-          <button
-            class="primary"
-            type="button"
-            id="emptyCreateCircle"
-          >
-            Create a circle
-          </button>
-        </div>
-      `;
-
-      $("emptyCreateCircle")
-        ?.addEventListener(
-          "click",
-          openCreateCircle
-        );
-
-      return;
-    }
-
-    container.innerHTML = circles.map(circle => {
-      const members =
-        circle._count?.memberships || 0;
-
-      const capacity =
-        Number(circle.capacity || 0);
-
-      const percentage =
-        capacity > 0
-          ? Math.min(
-              100,
-              Math.round(
-                (members / capacity) * 100
-              )
-            )
-          : 0;
-
-      return `
-        <article class="card dashboard-circle-card">
-
-          <div class="circle-meta">
-            <span class="circle-type">
-              ${escapeHTML(circle.type || "CUSTOM")}
-            </span>
-
-            <span class="circle-status">
-              ${members}/${capacity} members
-            </span>
-          </div>
-
-          <h3>
-            ${escapeHTML(
-              circle.name ||
-              circle.code ||
-              "Savings Circle"
-            )}
-          </h3>
-
-          <p>
-            Contribute
-            <strong>${money(circle.amountCents)}</strong>
-            toward your savings circle.
-          </p>
-
-          <div class="circle-details">
-
-            <div class="circle-detail">
-              <small>Contribution</small>
-              <strong>
-                ${money(circle.amountCents)}
-              </strong>
-            </div>
-
-            <div class="circle-detail">
-              <small>Members</small>
-              <strong>
-                ${members}/${capacity}
-              </strong>
-            </div>
-
-          </div>
-
-          <div class="circle-progress">
-            <b style="width:${percentage}%"></b>
-          </div>
-
-          <div class="circle-progress-label">
-            <span>${percentage}% filled</span>
-            <span>${escapeHTML(circle.code || "")}</span>
-          </div>
-
-          <button
-            type="button"
-            class="circle-choose-button"
-            data-circle-id="${escapeHTML(circle.id)}"
-          >
-            Choose this circle
-          </button>
-
-        </article>
-      `;
-    }).join("");
-
-    container
-      .querySelectorAll(".circle-choose-button")
-      .forEach(button => {
-
-        button.addEventListener("click", async () => {
-
-          try {
-            await getCircleDates(
-              button.dataset.circleId
-            );
-          } catch (error) {
-            alert(error.message);
-          }
-
-        });
-
-      });
+    renderCircles(circles);
 
   } catch (error) {
     container.innerHTML = `
@@ -849,1034 +801,664 @@ async function loadDashboardCircles() {
   }
 }
 
-async function getCircleDates(circleId) {
-  try {
-    const circles = await api("/circles");
+function renderCircles(circles = []) {
+  const container = $("#dashboardCircles");
 
-    const circle = circles.find(
-      item => item.id === circleId
-    );
+  if (!container) return;
 
-    if (!circle) {
-      throw new Error("Circle not found.");
-    }
-
-    const dates = await api(
-      `/circles/${encodeURIComponent(circleId)}/dates`
-    );
-
-    currentCircle = circle;
-    currentDates = Array.isArray(dates)
-      ? dates
-      : [];
-
-    if (!currentDates.length) {
-      showModal(`
-        <div class="eyebrow">SAVINGS CIRCLE</div>
-        <h2>${escapeHTML(
-          circle.name ||
-          circle.code ||
-          "Savings Circle"
-        )}</h2>
-
-        <p>
-          This circle does not have any payout dates
-          available yet.
-        </p>
-
-        <button
-          class="primary"
-          id="closeCircleNotice"
-          type="button"
-        >
-          Continue
-        </button>
-      `);
-
-      $("closeCircleNotice")
-        ?.addEventListener(
-          "click",
-          hideModal
-        );
-
-      return;
-    }
-
-    openCircleSelection(circle, currentDates);
-
-  } catch (error) {
-    throw error;
-  }
-}
-
-function openCircleSelection(circle, dates) {
-  showModal(`
-    <div class="eyebrow">CHOOSE YOUR CIRCLE</div>
-
-    <h2>
-      ${escapeHTML(
-        circle.name ||
-        circle.code ||
-        "Savings Circle"
-      )}
-    </h2>
-
-    <p>
-      Contribution:
-      <strong>${money(circle.amountCents)}</strong>
-    </p>
-
-    <label>Choose your payout date</label>
-
-    <select id="payoutDateSelect">
-      <option value="">Select a payout date</option>
-
-      ${dates.map(date => `
-        <option value="${escapeHTML(date.id)}"
-          ${Number(date.reserved) >= Number(date.capacity)
-            ? "disabled"
-            : ""}
-        >
-          ${formatDate(date.payoutAt)}
-          — ${date.reserved}/${date.capacity} reserved
-        </option>
-      `).join("")}
-
-    </select>
-
-    <button
-      class="primary"
-      id="reserveMembershipButton"
-      type="button"
-    >
-      Continue
-    </button>
-  `);
-
-  $("reserveMembershipButton")
-    ?.addEventListener(
-      "click",
-      reserveMembership
-    );
-}
-
-async function reserveMembership() {
-  const payoutDateId =
-    $("payoutDateSelect")?.value;
-
-  if (!currentCircle || !payoutDateId) {
-    alert("Please choose a payout date.");
+  if (!circles.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <h3>No savings circles available</h3>
+        <p>New circles will appear here when they are available.</p>
+      </div>
+    `;
     return;
   }
 
+  container.innerHTML = circles
+    .map(circle => {
+      const count = Number(circle._count?.memberships || 0);
+      const capacity = Number(circle.capacity || 0);
+      const progress =
+        capacity > 0
+          ? Math.min(100, Math.round((count / capacity) * 100))
+          : 0;
+
+      return `
+        <article class="dashboard-circle-card">
+          <div class="circle-meta">
+            <span class="circle-type">
+              ${escapeHTML(getTypeLabel(circle.type))}
+            </span>
+
+            <span class="circle-status ${getStatusClass(circle.status)}">
+              ${escapeHTML(getStatusLabel(circle.status))}
+            </span>
+          </div>
+
+          <h3>
+            ${escapeHTML(circle.name || "PayaCircle Savings Circle")}
+          </h3>
+
+          <p class="circle-code">
+            Circle code: ${escapeHTML(circle.code || "")}
+          </p>
+
+          <div class="circle-detail">
+            <span>Contribution</span>
+            <strong>${money(circle.amountCents)}</strong>
+          </div>
+
+          <div class="circle-detail">
+            <span>Members</span>
+            <strong>${count} / ${capacity}</strong>
+          </div>
+
+          <div class="circle-progress">
+            <div class="circle-progress-bar" style="width:${progress}%"></div>
+          </div>
+
+          <div class="circle-progress-label">
+            ${progress}% filled
+          </div>
+
+          <button
+            class="circle-choose-button"
+            type="button"
+            data-choose-circle="${escapeHTML(circle.id)}"
+          >
+            View Circle
+          </button>
+        </article>
+      `;
+    })
+    .join("");
+
+  $$("[data-choose-circle]").forEach(button => {
+    button.addEventListener("click", () => {
+      openCircleDetails(button.dataset.chooseCircle);
+    });
+  });
+}
+
+async function openCircleDetails(circleId) {
   try {
-    const membership = await api(
-      "/memberships",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          circleId: currentCircle.id,
-          payoutDateId
+    const circles = await api("/circles");
+
+    const circle = circles.find(item => item.id === circleId);
+
+    if (!circle) {
+      showToast("Circle could not be found.", "error");
+      return;
+    }
+
+    currentCircle = circle;
+
+    await showCircleSelection(circle);
+
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function showCircleSelection(circle) {
+  const container = $("#circleSelectionContent");
+
+  if (!container) {
+    activateAccountPanel("circles");
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="payment-summary">
+      <h3>${escapeHTML(circle.name || "Savings Circle")}</h3>
+      <p>
+        ${escapeHTML(getTypeLabel(circle.type))}
+        · ${money(circle.amountCents)} contribution
+      </p>
+    </div>
+
+    <div class="circle-details" id="circleDateOptions">
+      <div class="empty-state">
+        <p>Loading payout dates...</p>
+      </div>
+    </div>
+  `;
+
+  activateAccountPanel("circles");
+
+  try {
+    const dates = await api(`/circles/${encodeURIComponent(circle.id)}/dates`);
+
+    renderCircleDates(circle, dates);
+
+  } catch (error) {
+    const datesContainer = $("#circleDateOptions");
+
+    if (datesContainer) {
+      datesContainer.innerHTML = `
+        <div class="empty-state">
+          <h3>Payout dates are not available yet</h3>
+          <p>${escapeHTML(error.message)}</p>
+        </div>
+      `;
+    }
+  }
+}
+
+function renderCircleDates(circle, dates = []) {
+  const container = $("#circleDateOptions");
+
+  if (!container) return;
+
+  if (!dates.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">◷</div>
+        <h3>No payout dates available</h3>
+        <p>This circle does not have payout dates configured yet.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="circle-date-list">
+      ${dates
+        .map(date => {
+          const available =
+            Number(date.reserved || 0) <
+            Number(date.capacity || 0);
+
+          return `
+            <label class="circle-date-option ${available ? "" : "disabled"}">
+              <input
+                type="radio"
+                name="payoutDate"
+                value="${escapeHTML(date.id)}"
+                ${available ? "" : "disabled"}
+              >
+
+              <span class="circle-date-content">
+                <strong>${escapeHTML(formatDate(date.payoutAt))}</strong>
+                <small>
+                  ${available
+                    ? `${Number(date.capacity) - Number(date.reserved)} spot(s) available`
+                    : "Fully reserved"}
+                </small>
+              </span>
+            </label>
+          `;
         })
+        .join("")}
+    </div>
+
+    <button
+      class="circle-choose-button"
+      id="reserveCircleButton"
+      type="button"
+    >
+      Continue to Payment
+    </button>
+  `;
+
+  const reserveButton = $("#reserveCircleButton");
+
+  if (reserveButton) {
+    reserveButton.addEventListener("click", () => {
+      const selected = $('input[name="payoutDate"]:checked');
+
+      if (!selected) {
+        showToast("Please select a payout date.", "error");
+        return;
       }
+
+      const selectedDate = dates.find(
+        date => date.id === selected.value
+      );
+
+      currentPayoutDate = selectedDate;
+
+      reserveMembership(circle, selectedDate);
+    });
+  }
+}
+
+/* ------------------------------
+   MEMBERSHIP
+------------------------------ */
+
+async function reserveMembership(circle, payoutDate) {
+  const button = $("#reserveCircleButton");
+
+  setLoading(button, true, "Reserving...");
+
+  try {
+    const membership = await api("/memberships", {
+      method: "POST",
+      body: {
+        circleId: circle.id,
+        payoutDateId: payoutDate.id
+      }
+    });
+
+    currentMembership = membership;
+
+    showToast(
+      "Your payout position has been reserved.",
+      "success"
     );
-
-    currentMembershipId = membership.id;
-
-    hideModal();
 
     await refreshDashboard();
 
-    openPaymentPanel(
-      currentMembershipId
+    await openPaymentPanel(
+      membership.id,
+      circle,
+      payoutDate
     );
 
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
+  } finally {
+    setLoading(button, false);
   }
 }
 
-/* =========================
-   CREATE CIRCLE
-========================= */
+/* ------------------------------
+   CONTRIBUTIONS
+------------------------------ */
 
-function openCreateCircle() {
-  showModal(`
-    <div class="eyebrow">CREATE A CIRCLE</div>
-
-    <h2>Build your savings circle</h2>
-
-    <p>
-      Set the contribution amount and number of
-      members for your new circle.
-    </p>
-
-    <form id="createCircleForm">
-
-      <label>Circle name</label>
-      <input
-        name="name"
-        required
-        minlength="2"
-        maxlength="80"
-        placeholder="Family Savings"
-      />
-
-      <label>Circle type</label>
-      <select name="type" required>
-        <option value="FAMILY">Family</option>
-        <option value="FRIENDS">Friends</option>
-        <option value="SOCIAL_MEDIA">Social Media</option>
-        <option value="CUSTOM">Custom</option>
-      </select>
-
-      <label>Members</label>
-      <input
-        name="capacity"
-        type="number"
-        min="2"
-        max="1000"
-        value="10"
-        required
-      />
-
-      <label>Contribution</label>
-      <select name="amountUsd" required>
-        ${Array.from(
-          { length: 20 },
-          (_, index) => {
-            const amount =
-              (index + 1) * 5;
-
-            return `
-              <option value="${amount}">
-                $${amount}.00 USD
-              </option>
-            `;
-          }
-        ).join("")}
-      </select>
-
-      <button
-        class="primary"
-        type="submit"
-      >
-        Create circle
-      </button>
-
-    </form>
-  `);
-
-  $("createCircleForm")
-    ?.addEventListener(
-      "submit",
-      createCircle
-    );
-}
-
-async function createCircle(event) {
-  event.preventDefault();
-
-  const form = event.currentTarget;
-
-  const name =
-    form.querySelector('[name="name"]')
-      ?.value.trim();
-
-  const type =
-    form.querySelector('[name="type"]')
-      ?.value;
-
-  const capacity =
-    Number(
-      form.querySelector('[name="capacity"]')
-        ?.value
-    );
-
-  const amountUsd =
-    Number(
-      form.querySelector('[name="amountUsd"]')
-        ?.value
-    );
-
-  try {
-    await api("/circles", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        type,
-        capacity,
-        amountUsd
-      })
-    });
-
-    hideModal();
-
-    await loadDashboardCircles();
-
-    showModal(`
-      <div class="eyebrow">CIRCLE CREATED</div>
-      <h2>Your savings circle is ready.</h2>
-      <p>
-        Your circle has been created successfully.
-      </p>
-
-      <button
-        class="primary"
-        id="circleCreatedClose"
-        type="button"
-      >
-        View my circles
-      </button>
-    `);
-
-    $("circleCreatedClose")
-      ?.addEventListener(
-        "click",
-        () => {
-          hideModal();
-          switchAccountPanel("circles");
-        }
-      );
-
-  } catch (error) {
-    alert(error.message);
-  }
-}
-
-/* =========================
-   MEMBERSHIPS
-========================= */
-
-function renderMemberships(memberships) {
-  const container = $("myMemberships");
+function renderMemberships() {
+  const container = $("#membershipList");
 
   if (!container) return;
+
+  const memberships = Array.isArray(currentUser?.memberships)
+    ? currentUser.memberships
+    : [];
 
   if (!memberships.length) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">◎</div>
-        <h3>Your circles will appear here</h3>
-        <p>
-          Join a savings circle to start building
-          your PayaCircle history.
-        </p>
+        <h3>You haven't joined a circle yet</h3>
+        <p>Choose a savings circle to start building your savings.</p>
+
+        <button
+          class="setting-action"
+          type="button"
+          data-go-circles
+        >
+          Browse Circles
+        </button>
       </div>
     `;
-    return;
-  }
 
-  container.innerHTML = memberships.map(
-    membership => {
-
-      const circle =
-        membership.circle || {};
-
-      const status =
-        membership.status || "UNKNOWN";
-
-      const paymentStatus =
-        getMembershipPaymentStatus(
-          membership
-        );
-
-      return `
-        <div class="membership-row">
-
-          <div class="membership-main">
-
-            <div class="membership-icon">
-              ◎
-            </div>
-
-            <div>
-              <strong>
-                ${escapeHTML(
-                  circle.name ||
-                  circle.code ||
-                  "Savings Circle"
-                )}
-              </strong>
-
-              <span>
-                ${escapeHTML(
-                  circle.type ||
-                  "CUSTOM"
-                )}
-              </span>
-            </div>
-
-          </div>
-
-          <div class="membership-info">
-            <small>Contribution</small>
-            <strong>
-              ${money(circle.amountCents)}
-            </strong>
-          </div>
-
-          <div class="membership-info">
-            <small>Payout</small>
-            <strong>
-              ${formatDate(
-                membership.payoutDate?.payoutAt
-              )}
-            </strong>
-          </div>
-
-          <div class="membership-info">
-            <small>Status</small>
-            <span class="status-badge ${statusClass(paymentStatus)}">
-              ${escapeHTML(paymentStatus)}
-            </span>
-          </div>
-
-          <div>
-            ${
-              status === "PAYMENT_PENDING"
-                ? `
-                  <button
-                    class="setting-action pay-membership-button"
-                    type="button"
-                    data-membership-id="${escapeHTML(
-                      membership.id
-                    )}"
-                  >
-                    Pay now
-                  </button>
-                `
-                : `
-                  <button
-                    class="setting-action view-membership-button"
-                    type="button"
-                    data-membership-id="${escapeHTML(
-                      membership.id
-                    )}"
-                  >
-                    View
-                  </button>
-                `
-            }
-          </div>
-
-        </div>
-      `;
-    }
-  ).join("");
-
-  container
-    .querySelectorAll(".pay-membership-button")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        () => {
-          currentMembershipId =
-            button.dataset.membershipId;
-
-          openPaymentPanel(
-            currentMembershipId
-          );
-        }
-      );
-    });
-
-  container
-    .querySelectorAll(".view-membership-button")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        () => {
-          const membership =
-            memberships.find(
-              item =>
-                item.id ===
-                button.dataset.membershipId
-            );
-
-          if (membership) {
-            showMembershipDetails(
-              membership
-            );
-          }
-        }
-      );
-    });
-}
-
-function getMembershipPaymentStatus(
-  membership
-) {
-  if (
-    membership.status === "PAID" ||
-    membership.status === "PAYOUT_SCHEDULED" ||
-    membership.status === "PAID_OUT"
-  ) {
-    return "Paid";
-  }
-
-  if (membership.status === "PAYMENT_PENDING") {
-    return "Pending";
-  }
-
-  if (membership.status === "REFUNDED") {
-    return "Refunded";
-  }
-
-  if (membership.status === "CANCELLED") {
-    return "Cancelled";
-  }
-
-  const payments =
-    Array.isArray(membership.payments)
-      ? membership.payments
-      : [];
-
-  if (
-    payments.some(
-      payment =>
-        payment.status === "FAILED"
-    )
-  ) {
-    return "Failed";
-  }
-
-  return "Pending";
-}
-
-function statusClass(status) {
-  const value =
-    String(status || "")
-      .toLowerCase();
-
-  if (value === "paid") {
-    return "status-paid";
-  }
-
-  if (value === "pending") {
-    return "status-pending";
-  }
-
-  if (value === "failed") {
-    return "status-failed";
-  }
-
-  if (value === "refunded") {
-    return "status-refunded";
-  }
-
-  return "status-pending";
-}
-
-function showMembershipDetails(membership) {
-  const circle =
-    membership.circle || {};
-
-  showModal(`
-    <div class="eyebrow">MY CIRCLE</div>
-
-    <h2>
-      ${escapeHTML(
-        circle.name ||
-        circle.code ||
-        "Savings Circle"
-      )}
-    </h2>
-
-    <div class="payment-summary">
-
-      <div>
-        <small>Contribution</small>
-        <strong>
-          ${money(circle.amountCents)}
-        </strong>
-      </div>
-
-      <div>
-        <small>Payout date</small>
-        <strong>
-          ${formatDate(
-            membership.payoutDate?.payoutAt
-          )}
-        </strong>
-      </div>
-
-      <div>
-        <small>Status</small>
-        <strong>
-          ${escapeHTML(
-            getMembershipPaymentStatus(
-              membership
-            )
-          )}
-        </strong>
-      </div>
-
-    </div>
-
-    <button
-      class="primary"
-      id="membershipDetailsClose"
-      type="button"
-    >
-      Close
-    </button>
-  `);
-
-  $("membershipDetailsClose")
-    ?.addEventListener(
-      "click",
-      hideModal
-    );
-}
-
-/* =========================
-   CONTRIBUTIONS
-========================= */
-
-function renderTransactions(memberships) {
-  const container =
-    $("contributionTransactions");
-
-  if (!container) return;
-
-  const transactions = [];
-
-  memberships.forEach(membership => {
-
-    const payments =
-      Array.isArray(membership.payments)
-        ? membership.payments
-        : [];
-
-    payments.forEach(payment => {
-      transactions.push({
-        ...payment,
-        circle:
-          membership.circle?.name ||
-          membership.circle?.code ||
-          "Savings Circle"
+    $$("[data-go-circles]").forEach(button => {
+      button.addEventListener("click", () => {
+        activateAccountPanel("circles");
       });
     });
 
-  });
+    return;
+  }
 
-  transactions.sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() -
-      new Date(a.createdAt).getTime()
-  );
+  container.innerHTML = memberships
+    .map(membership => {
+      const circle = membership.circle || {};
+      const date = membership.payoutDate || {};
 
-  if (!transactions.length) {
+      return `
+        <div class="membership-row">
+          <div class="membership-icon">◎</div>
+
+          <div class="membership-main">
+            <div class="membership-info">
+              <strong>
+                ${escapeHTML(circle.name || circle.code || "Savings Circle")}
+              </strong>
+
+              <span>
+                ${escapeHTML(getTypeLabel(circle.type))}
+                · ${money(circle.amountCents)}
+              </span>
+
+              <small>
+                Payout: ${escapeHTML(formatDate(date.payoutAt))}
+              </small>
+            </div>
+
+            <span class="status-badge ${getStatusClass(membership.status)}">
+              ${escapeHTML(getStatusLabel(membership.status))}
+            </span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+/* ------------------------------
+   TRANSACTIONS
+------------------------------ */
+
+function renderTransactions() {
+  const container = $("#contributionTransactions");
+
+  if (!container) return;
+
+  const memberships = Array.isArray(currentUser?.memberships)
+    ? currentUser.memberships
+    : [];
+
+  if (!memberships.length) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">↗</div>
+        <div class="empty-icon">◇</div>
         <h3>No contributions yet</h3>
-        <p>
-          Confirmed contributions will appear here.
-        </p>
+        <p>Your contribution history will appear here.</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML =
-    transactions.map(transaction => {
+  const rows = [];
 
-      const status =
-        transaction.status || "CREATED";
+  memberships.forEach(membership => {
+    const circle = membership.circle || {};
 
+    const payments = Array.isArray(membership.payments)
+      ? membership.payments
+      : [];
+
+    if (payments.length) {
+      payments.forEach(payment => {
+        rows.push({
+          date: payment.createdAt,
+          title: circle.name || circle.code || "Savings Circle",
+          status: payment.status,
+          amount: payment.amountCents
+        });
+      });
+    } else {
+      rows.push({
+        date: membership.createdAt,
+        title: circle.name || circle.code || "Savings Circle",
+        status: membership.status,
+        amount: circle.amountCents
+      });
+    }
+  });
+
+  rows.sort(
+    (a, b) =>
+      new Date(b.date || 0) -
+      new Date(a.date || 0)
+  );
+
+  container.innerHTML = rows
+    .map(transaction => {
       return `
         <div class="transaction-row">
-
-          <div class="transaction-icon">
-            $
-          </div>
+          <div class="transaction-icon">↗</div>
 
           <div class="transaction-info">
-            <strong>
-              ${escapeHTML(transaction.circle)}
-            </strong>
-
+            <strong>${escapeHTML(transaction.title)}</strong>
             <span>
-              ${formatDateTime(
-                transaction.createdAt
-              )}
-              · PayPal
+              ${escapeHTML(getStatusLabel(transaction.status))}
+              · ${escapeHTML(formatDate(transaction.date))}
             </span>
           </div>
 
           <div class="transaction-amount">
-
-            <strong>
-              ${money(transaction.amountCents)}
-            </strong>
-
-            <span class="status-badge ${statusClass(
-              status === "CAPTURED"
-                ? "Paid"
-                : status === "FAILED"
-                ? "Failed"
-                : "Pending"
-            )}">
-              ${
-                status === "CAPTURED"
-                  ? "Paid"
-                  : status === "FAILED"
-                  ? "Failed"
-                  : "Pending"
-              }
-            </span>
-
+            ${money(transaction.amount)}
           </div>
-
         </div>
       `;
-    }).join("");
+    })
+    .join("");
 }
 
-/* =========================
+/* ------------------------------
    PAYOUTS
-========================= */
+------------------------------ */
 
-function renderPayouts(memberships) {
-  const container =
-    $("payoutTimeline");
+function renderPayouts() {
+  const container = $("#payoutTimeline");
 
   if (!container) return;
 
-  const payouts = memberships
-    .filter(
-      membership =>
-        membership.payoutDate
-    )
-    .map(membership => ({
-      membership,
-      date:
-        membership.payoutDate?.payoutAt
-    }))
+  const memberships = Array.isArray(currentUser?.memberships)
+    ? currentUser.memberships
+    : [];
+
+  const payoutItems = memberships
+    .filter(membership => membership.payoutDate)
     .sort(
       (a, b) =>
-        new Date(a.date).getTime() -
-        new Date(b.date).getTime()
+        new Date(a.payoutDate.payoutAt) -
+        new Date(b.payoutDate.payoutAt)
     );
 
-  if (!payouts.length) {
+  if (!payoutItems.length) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">◷</div>
         <h3>No payouts scheduled</h3>
-        <p>
-          Your scheduled payout information will
-          appear here.
-        </p>
+        <p>Your payout schedule will appear here after joining a circle.</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML =
-    payouts.map(item => {
+  container.innerHTML = payoutItems
+    .map(membership => {
+      const circle = membership.circle || {};
+      const payout = membership.payout;
+      const date = membership.payoutDate;
 
-      const membership =
-        item.membership;
-
-      const circle =
-        membership.circle || {};
-
-      const amount =
-        Number(circle.amountCents || 0);
-
-      const payoutStatus =
-        membership.status === "PAID_OUT"
-          ? "Completed"
-          : membership.status === "PAYOUT_SCHEDULED"
-          ? "Scheduled"
-          : "Upcoming";
+      const status =
+        payout?.status ||
+        membership.status ||
+        "SCHEDULED";
 
       return `
         <div class="payout-item">
-
-          <div class="payout-dot">
-            $
-          </div>
+          <div class="payout-dot"></div>
 
           <div class="payout-info">
-
             <strong>
-              ${escapeHTML(
-                circle.name ||
-                circle.code ||
-                "Savings Circle"
-              )}
+              ${escapeHTML(circle.name || circle.code || "Savings Circle")}
             </strong>
 
             <span>
-              ${formatDate(item.date)}
+              ${escapeHTML(formatDate(date.payoutAt))}
             </span>
 
+            <small>
+              ${escapeHTML(getStatusLabel(status))}
+            </small>
           </div>
 
           <div class="payout-value">
-
-            <strong>
-              ${money(amount)}
-            </strong>
-
-            <span>
-              ${payoutStatus}
-            </span>
-
+            ${money(payout?.amountCents || circle.amountCents)}
           </div>
-
         </div>
       `;
-    }).join("");
+    })
+    .join("");
 }
 
-/* =========================
-   PROFILE
-========================= */
+/* ------------------------------
+   PAYMENT METHODS
+------------------------------ */
 
-function renderProfile(user) {
-  if ($("profileName")) {
-    $("profileName").textContent =
-      user?.name || "Member";
-  }
+function renderPaymentMethods() {
+  const container = $("#paymentMethodList");
 
-  if ($("profileEmail")) {
-    $("profileEmail").textContent =
-      user?.email || "—";
-  }
+  if (!container) return;
 
-  if ($("profilePaypalEmail")) {
-    $("profilePaypalEmail").textContent =
-      user?.paypalEmail ||
-      "Not connected";
-  }
-}
-
-/* =========================
-   PAYMENT PANEL
-========================= */
-
-function openPaymentPanel(membershipId) {
-  const panel =
-    $("paymentPanel");
-
-  const details =
-    $("paymentDetails");
-
-  if (!panel || !details) return;
-
-  const membership =
-    currentUser?.memberships?.find(
-      item =>
-        item.id === membershipId
-    );
-
-  if (!membership) {
-    alert("Membership could not be found.");
-    return;
-  }
-
-  const circle =
-    membership.circle || {};
-
-  details.innerHTML = `
+  container.innerHTML = `
     <div class="payment-summary">
-
       <div>
-        <small>Circle</small>
-        <strong>
-          ${escapeHTML(
-            circle.name ||
-            circle.code ||
-            "Savings Circle"
-          )}
-        </strong>
+        <strong>PayPal</strong>
+        <p>
+          Pay securely through PayPal when you make a PayaCircle contribution.
+        </p>
       </div>
 
-      <div>
-        <small>Contribution</small>
-        <strong>
-          ${money(circle.amountCents)}
-        </strong>
-      </div>
-
-      <div>
-        <small>Payout date</small>
-        <strong>
-          ${formatDate(
-            membership.payoutDate?.payoutAt
-          )}
-        </strong>
-      </div>
-
+      <span class="status-badge paid">Available</span>
     </div>
   `;
-
-  panel.style.display = "block";
-
-  panel.scrollIntoView({
-    behavior: "smooth",
-    block: "center"
-  });
 }
 
-function closePaymentPanel() {
-  const panel =
-    $("paymentPanel");
+/* ------------------------------
+   PROFILE
+------------------------------ */
 
-  if (panel) {
-    panel.style.display = "none";
+function renderProfile() {
+  if (!currentUser) return;
+
+  const name = $("#profileName");
+  const email = $("#profileEmail");
+  const paypalEmail = $("#profilePaypalEmail");
+
+  if (name) {
+    name.value = currentUser.name || "";
   }
 
-  currentMembershipId = null;
+  if (email) {
+    email.value = currentUser.email || "";
+  }
+
+  if (paypalEmail) {
+    paypalEmail.value = currentUser.paypalEmail || "";
+  }
 }
 
-/* =========================
+/* ------------------------------
    PAYPAL
-========================= */
+------------------------------ */
 
-async function startPayPalPayment() {
-  if (!currentMembershipId) {
-    alert("Please select a membership first.");
+async function openPaymentPanel(
+  membershipId,
+  circle,
+  payoutDate
+) {
+  currentMembership = {
+    id: membershipId,
+    ...currentMembership
+  };
+
+  currentCircle = circle;
+  currentPayoutDate = payoutDate;
+
+  const panel = $("#paymentPanel");
+
+  if (!panel) {
+    activateAccountPanel("payment-methods");
     return;
   }
 
-  const button =
-    $("paypalButton");
+  const title = $("#paymentCircleName");
+  const amount = $("#paymentAmount");
+  const date = $("#paymentPayoutDate");
+
+  if (title) {
+    title.textContent =
+      circle.name || circle.code || "PayaCircle";
+  }
+
+  if (amount) {
+    amount.textContent = money(circle.amountCents);
+  }
+
+  if (date) {
+    date.textContent = formatDate(payoutDate.payoutAt);
+  }
+
+  activateAccountPanel("payment-methods");
+
+  panel.hidden = false;
+
+  const payButton = $("#paypalPayButton");
+
+  if (payButton) {
+    payButton.disabled = false;
+    payButton.textContent = "Continue with PayPal";
+
+    payButton.onclick = () => beginPayPalPayment(
+      membershipId
+    );
+  }
+}
+
+async function beginPayPalPayment(membershipId) {
+  const button = $("#paypalPayButton");
+
+  setLoading(
+    button,
+    true,
+    "Connecting to PayPal..."
+  );
 
   try {
+    const data = await api("/paypal/create-order", {
+      method: "POST",
+      body: {
+        membershipId
+      }
+    });
 
-    if (button) {
-      button.disabled = true;
-      button.textContent =
-        "Connecting to PayPal...";
-    }
-
-    const result =
-      await api(
-        "/paypal/create-order",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            membershipId:
-              currentMembershipId
-          })
-        }
+    if (!data.approvalUrl) {
+      throw new Error(
+        "PayPal approval link was not returned."
       );
-
-    if (result.approvalUrl) {
-      window.location.href =
-        result.approvalUrl;
-
-      return;
     }
 
-    throw new Error(
-      "PayPal did not return an approval link."
+    showToast(
+      "Opening PayPal Sandbox...",
+      "success"
     );
 
+    window.location.href = data.approvalUrl;
+
   } catch (error) {
-
-    alert(error.message);
-
-    if (button) {
-      button.disabled = false;
-      button.textContent =
-        "Pay with PayPal";
-    }
+    showToast(error.message, "error");
+    setLoading(button, false);
   }
 }
 
+/* ------------------------------
+   PAYPAL RETURN
+------------------------------ */
+
 async function handlePayPalReturn() {
-  const params =
-    new URLSearchParams(
-      window.location.search
-    );
+  if (paypalReturnHandled) return;
 
-  const paypalStatus =
-    params.get("paypal");
+  const params = new URLSearchParams(
+    window.location.search
+  );
 
-  const orderId =
-    params.get("token");
-
-  if (paypalStatus === "cancel") {
-
-    window.history.replaceState(
-      {},
-      document.title,
-      window.location.pathname
-    );
-
-    showModal(`
-      <div class="eyebrow">
-        PAYMENT CANCELLED
-      </div>
-
-      <h2>
-        Payment was cancelled
-      </h2>
-
-      <p>
-        Your membership is still reserved and
-        remains payment-pending.
-      </p>
-
-      <button
-        class="primary"
-        id="cancelReturnButton"
-        type="button"
-      >
-        Return to dashboard
-      </button>
-    `);
-
-    $("cancelReturnButton")
-      ?.addEventListener(
-        "click",
-        hideModal
-      );
-
-    return;
-  }
+  const paypalStatus = params.get("paypal");
+  const token = params.get("token");
 
   if (
-    paypalStatus !== "success" ||
-    !orderId
+    paypalStatus !== "success" &&
+    paypalStatus !== "cancel"
   ) {
     return;
   }
 
-  try {
+  paypalReturnHandled = true;
 
-    showModal(`
-      <div class="eyebrow">
-        PAYPAL PAYMENT
-      </div>
-
-      <h2>
-        Confirming your payment...
-      </h2>
-
-      <p>
-        Please wait while PayaCircle confirms
-        your PayPal transaction.
-      </p>
-    `);
-
-    const result =
-      await api(
-        "/paypal/capture-order",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            orderId
-          })
-        }
-      );
+  if (paypalStatus === "cancel") {
+    showToast(
+      "PayPal payment was cancelled.",
+      "info"
+    );
 
     window.history.replaceState(
       {},
@@ -1884,207 +1466,402 @@ async function handlePayPalReturn() {
       window.location.pathname
     );
 
-    if (
-      result.status ===
-      "COMPLETED"
-    ) {
+    return;
+  }
 
-      hideModal();
+  if (!token) {
+    showToast(
+      "PayPal returned without an order ID.",
+      "error"
+    );
+    return;
+  }
 
-      const success =
-        $("paymentSuccess");
+  try {
+    await loadCurrentUser();
 
-      if (success) {
-        success.style.display = "flex";
-
-        success.scrollIntoView({
-          behavior: "smooth",
-          block: "center"
-        });
-      }
-
-      await showDashboard();
-
-      const refreshedSuccess =
-        $("paymentSuccess");
-
-      if (refreshedSuccess) {
-        refreshedSuccess.style.display =
-          "flex";
-      }
-
-    } else {
-
-      showModal(`
-        <div class="eyebrow">
-          PAYMENT STATUS
-        </div>
-
-        <h2>
-          Payment was not completed
-        </h2>
-
-        <p>
-          PayPal returned the status:
-          <strong>
-            ${escapeHTML(
-              result.status ||
-              "UNKNOWN"
-            )}
-          </strong>
-        </p>
-
-        <button
-          class="primary"
-          id="paymentStatusClose"
-          type="button"
-        >
-          Return to dashboard
-        </button>
-      `);
-
-      $("paymentStatusClose")
-        ?.addEventListener(
-          "click",
-          hideModal
-        );
+    if (!currentUser) {
+      showToast(
+        "Please sign in again to complete the payment.",
+        "error"
+      );
+      return;
     }
 
-  } catch (error) {
-
-    console.error(
-      "PayPal capture error:",
-      error
+    const result = await api(
+      "/paypal/capture-order",
+      {
+        method: "POST",
+        body: {
+          orderId: token
+        }
+      }
     );
 
-    showModal(`
-      <div class="eyebrow">
-        PAYMENT ERROR
-      </div>
-
-      <h2>
-        We could not confirm the payment
-      </h2>
-
-      <p>
-        Please check your PayPal account before
-        attempting another payment.
-      </p>
-
-      <p>
-        Error:
-        ${escapeHTML(error.message)}
-      </p>
-
-      <button
-        class="primary"
-        id="paymentErrorClose"
-        type="button"
-      >
-        Return to dashboard
-      </button>
-    `);
-
-    $("paymentErrorClose")
-      ?.addEventListener(
-        "click",
-        hideModal
+    if (result.status === "COMPLETED") {
+      showToast(
+        "Payment confirmed successfully.",
+        "success"
       );
+    } else {
+      showToast(
+        `PayPal returned status: ${result.status || "unknown"}`,
+        "info"
+      );
+    }
+
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    );
+
+    await showDashboard();
+
+  } catch (error) {
+    showToast(
+      error.message,
+      "error"
+    );
   }
 }
 
-/* =========================
-   REFRESH
-========================= */
+/* ------------------------------
+   CREATE CIRCLE
+------------------------------ */
 
-async function refreshDashboard() {
-  const user =
-    await api("/me");
+async function createCircle(event) {
+  event.preventDefault();
 
-  currentUser = user;
-  dashboardData = user;
+  const form = event.currentTarget;
+  const button = form.querySelector(
+    'button[type="submit"]'
+  );
 
-  renderDashboard(user);
-  await loadDashboardCircles();
-}
+  const name = form.querySelector(
+    '[name="name"]'
+  )?.value.trim();
 
-/* =========================
-   PUBLIC NAVIGATION
-========================= */
+  const type = form.querySelector(
+    '[name="type"]'
+  )?.value;
 
-function setupPublicNavigation() {
+  const capacityValue = form.querySelector(
+    '[name="capacity"]'
+  )?.value;
 
-  document
-    .querySelectorAll(
-      "[data-login], .nav-login"
-    )
-    .forEach(button => {
+  const amountValue = form.querySelector(
+    '[name="amountUsd"]'
+  )?.value;
 
-      if (button.dataset.loginBound === "true") {
-        return;
+  const capacity = Number(capacityValue);
+  const amountUsd = Number(amountValue);
+
+  if (
+    !name ||
+    !type ||
+    !Number.isInteger(capacity) ||
+    !amountUsd
+  ) {
+    showToast(
+      "Please complete the circle details.",
+      "error"
+    );
+    return;
+  }
+
+  setLoading(
+    button,
+    true,
+    "Creating circle..."
+  );
+
+  try {
+    await api("/circles", {
+      method: "POST",
+      body: {
+        name,
+        type,
+        capacity,
+        amountUsd
       }
-
-      button.dataset.loginBound = "true";
-
-      button.addEventListener(
-        "click",
-        openLogin
-      );
     });
 
-  document
-    .querySelectorAll(
-      "[data-register], .nav-cta, .cta"
-    )
-    .forEach(button => {
+    showToast(
+      "Savings circle created successfully.",
+      "success"
+    );
+
+    form.reset();
+
+    await loadDashboardCircles();
+
+  } catch (error) {
+    showToast(
+      error.message,
+      "error"
+    );
+  } finally {
+    setLoading(button, false);
+  }
+}
+
+/* ------------------------------
+   PUBLIC CIRCLE PREVIEW
+------------------------------ */
+
+async function loadPublicCircles() {
+  const container =
+    $("#publicCircles") ||
+    $("#circleGrid") ||
+    $("#circlesGrid");
+
+  if (!container) return;
+
+  try {
+    const circles = await api("/circles");
+
+    if (!circles.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <h3>No circles available yet</h3>
+          <p>Check back soon for new savings circles.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = circles
+      .slice(0, 6)
+      .map(circle => {
+        const count =
+          Number(circle._count?.memberships || 0);
+
+        return `
+          <article class="circle-card">
+            <span class="circle-type">
+              ${escapeHTML(getTypeLabel(circle.type))}
+            </span>
+
+            <h3>
+              ${escapeHTML(
+                circle.name ||
+                "PayaCircle Savings Circle"
+              )}
+            </h3>
+
+            <p>
+              ${money(circle.amountCents)}
+              contribution
+            </p>
+
+            <small>
+              ${count} / ${circle.capacity} members
+            </small>
+          </article>
+        `;
+      })
+      .join("");
+
+  } catch (_) {
+    // Public circle preview is optional.
+  }
+}
+
+/* ------------------------------
+   PUBLIC NAVIGATION
+------------------------------ */
+
+function bindPublicNavigation() {
+  $$("a[href^='#']").forEach(link => {
+    link.addEventListener("click", event => {
+      const targetId =
+        link.getAttribute("href");
 
       if (
-        button.id === "paypalButton" ||
-        button.dataset.registerBound === "true"
+        !targetId ||
+        targetId === "#" ||
+        document.body.classList.contains(
+          "dashboard-active"
+        )
       ) {
         return;
       }
 
-      button.dataset.registerBound = "true";
+      const target =
+        document.querySelector(targetId);
 
-      button.addEventListener(
-        "click",
-        event => {
+      if (!target) return;
 
-          if (
-            button.closest("#dashboard")
-          ) {
-            return;
-          }
+      event.preventDefault();
 
-          event.preventDefault();
-          openRegister();
-        }
-      );
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
     });
+  });
 }
 
-/* =========================
+/* ------------------------------
+   MOBILE MENU
+------------------------------ */
+
+function bindMobileMenu() {
+  const toggle =
+    $("[data-mobile-toggle]") ||
+    $("#mobileMenuToggle");
+
+  const menu =
+    $("[data-mobile-menu-public]") ||
+    $("#mobileMenu");
+
+  if (!toggle || !menu) return;
+
+  toggle.addEventListener("click", () => {
+    menu.classList.toggle("open");
+  });
+}
+
+/* ------------------------------
+   FORMS
+------------------------------ */
+
+function bindForms() {
+  const registerForm = $("#registerForm");
+
+  if (
+    registerForm &&
+    !registerForm.dataset.bound
+  ) {
+    registerForm.dataset.bound = "true";
+
+    registerForm.addEventListener(
+      "submit",
+      registerUser
+    );
+  }
+
+  const loginForm = $("#loginForm");
+
+  if (
+    loginForm &&
+    !loginForm.dataset.bound
+  ) {
+    loginForm.dataset.bound = "true";
+
+    loginForm.addEventListener(
+      "submit",
+      loginUser
+    );
+  }
+
+  const createCircleForm =
+    $("#createCircleForm");
+
+  if (
+    createCircleForm &&
+    !createCircleForm.dataset.bound
+  ) {
+    createCircleForm.dataset.bound = "true";
+
+    createCircleForm.addEventListener(
+      "submit",
+      createCircle
+    );
+  }
+}
+
+/* ------------------------------
+   LOGOUT BUTTONS
+------------------------------ */
+
+function bindLogoutButtons() {
+  $$("[data-logout]").forEach(button => {
+    button.addEventListener(
+      "click",
+      event => {
+        event.preventDefault();
+        logoutUser();
+      }
+    );
+  });
+}
+
+/* ------------------------------
+   GET STARTED
+------------------------------ */
+
+function bindGetStarted() {
+  $$("[data-get-started]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+
+      if (currentUser) {
+        showDashboard();
+      } else {
+        openRegister();
+      }
+    });
+  });
+}
+
+/* ------------------------------
+   REFRESH BUTTONS
+------------------------------ */
+
+function bindRefreshButtons() {
+  $$("[data-refresh-dashboard]").forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        async event => {
+          event.preventDefault();
+
+          setLoading(
+            button,
+            true,
+            "Refreshing..."
+          );
+
+          try {
+            await refreshDashboard();
+            showToast(
+              "Account refreshed.",
+              "success"
+            );
+          } finally {
+            setLoading(
+              button,
+              false
+            );
+          }
+        }
+      );
+    }
+  );
+}
+
+/* ------------------------------
    INITIALIZATION
-========================= */
+------------------------------ */
 
-async function load() {
+async function initializeApp() {
+  bindAuthButtons();
+  bindAccountNavigation();
+  bindForms();
+  bindLogoutButtons();
+  bindGetStarted();
+  bindRefreshButtons();
+  bindPublicNavigation();
+  bindMobileMenu();
 
-  setupPublicNavigation();
+  await loadCurrentUser();
 
-  await loadPublicCircles();
-
-  try {
-
-    const user =
-      await api("/me");
-
-    currentUser = user;
-
+  if (currentUser) {
     await showDashboard();
-
-  } catch {
-    hideDashboard();
+  } else {
+    await loadPublicCircles();
   }
 
   await handlePayPalReturn();
@@ -2092,5 +1869,5 @@ async function load() {
 
 document.addEventListener(
   "DOMContentLoaded",
-  load
+  initializeApp
 );
