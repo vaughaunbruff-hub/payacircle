@@ -1,883 +1,187 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="PayaCircle — scheduled savings circles with transparent contribution levels and payout dates.">
-  <title>PayaCircle — Save Together. Grow Together.</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="/app.css">
-</head>
-
-<body>
-
-<div class="announcement">
-  Flexible savings circles
-  <span>•</span>
-  Scheduled payouts
-  <span>•</span>
-  Secure PayPal payments
-</div>
-
-<header>
-  <a class="brand" href="/">
-    <span class="brandmark">C</span>
-    <span>
-      PayaCircle
-      <small>Save Together. Grow Together.</small>
-    </span>
-  </a>
-
-  <nav>
-    <a href="#circles">Circles</a>
-    <a href="#how">How it works</a>
-    <a href="#security">Security</a>
-    <a href="#about">About</a>
-
-    <button class="nav-login" onclick="showLogin()">
-      Sign in
-    </button>
-
-    <button class="nav-cta" onclick="showRegister()">
-      Get started
-    </button>
-  </nav>
-</header>
-
-<main>
-
-<!-- =========================
-     HOMEPAGE
-========================= -->
-
-<section class="hero">
-
-  <div class="hero-overlay"></div>
-
-  <div class="hero-copy">
-
-    <div class="eyebrow">
-      FLEXIBLE SAVINGS CIRCLES
-    </div>
-
-    <h1>
-      Save together.<br>
-      <span>Get paid on schedule.</span>
-    </h1>
-
-    <p>
-      Choose your contribution level, reserve an available payout date
-      and build your savings circle with a clear, predictable schedule.
-    </p>
-
-    <div class="hero-actions">
-
-      <a class="cta" href="#circles">
-        Join a circle <b>→</b>
-      </a>
-
-      <button
-        class="ghost"
-        onclick="document.querySelector('#how').scrollIntoView({behavior:'smooth'})"
-      >
-        <span class="play">▶</span>
-        How it works
-      </button>
-
-    </div>
-
-    <div class="trust-row">
-
-      <div>
-        <b>✓</b>
-        <span>
-          Secure payments
-          <small>via PayPal</small>
-        </span>
-      </div>
-
-      <div>
-        <b>◎</b>
-        <span>
-          Flexible size
-          <small>10+ members</small>
-        </span>
-      </div>
-
-      <div>
-        <b>◷</b>
-        <span>
-          Scheduled payouts
-          <small>your chosen date</small>
-        </span>
-      </div>
-
-      <div>
-        <b>▣</b>
-        <span>
-          Transparent
-          <small>member ledger</small>
-        </span>
-      </div>
-
-    </div>
-
-  </div>
-
-  <div class="hero-card-wrap">
-
-    <div class="hero-card">
-
-      <div class="card-top">
-        <span>LIVE CIRCLE STATUS</span>
-        <i>● Collecting</i>
-      </div>
-
-      <div class="big-number">
-        64 <small>/ 100</small>
-      </div>
-
-      <div class="progress">
-        <b style="width:64%"></b>
-      </div>
-
-      <div class="mini-grid">
-
-        <div>
-          <small>Current level</small>
-          <strong>Example: $25 / week</strong>
-        </div>
-
-        <div>
-          <small>Next payout</small>
-          <strong>Oct 16</strong>
-        </div>
-
-        <div>
-          <small>Scheduled dates</small>
-          <strong>100</strong>
-        </div>
-
-        <div>
-          <small>House fee</small>
-          <strong>$100</strong>
-        </div>
-
-      </div>
-
-      <div class="member-stack">
-        <span>Members paying now</span>
-
-        <div>
-          <b>VB</b>
-          <b>JR</b>
-          <b>KM</b>
-          <b>+</b>
-        </div>
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<!-- =========================
-     CIRCLES
-========================= -->
-
-<section class="levels" id="circles">
-
-  <div class="section-head">
-
-    <div>
-
-      <div class="eyebrow">
-        CHOOSE YOUR LEVEL
-      </div>
-
-      <h2>
-        One platform. Contribution levels from $5 to $100.
-      </h2>
-
-      <p>
-        Choose Family, Friends, Social Media, or create a Custom
-        circle for your own group.
-      </p>
-
-    </div>
-
-    <div class="head-pill">
-      10–1000+ members
-      <span>depending on plan</span>
-    </div>
-
-  </div>
-
-  <div id="circlesGrid" class="cards"></div>
-
-</section>
-
-
-<!-- =========================
-     HOW IT WORKS
-========================= -->
-
-<section class="how" id="how">
-
-  <div class="section-head center">
-
-    <div class="eyebrow">
-      HOW IT WORKS
-    </div>
-
-    <h2>
-      Simple. Clear. Scheduled.
-    </h2>
-
-    <p>
-      From registration to payout, every important step is visible.
-    </p>
-
-  </div>
-
-  <div class="steps">
-
-    <article>
-      <div class="step-icon">01</div>
-      <h3>Create your account</h3>
-      <p>
-        Register securely and manage your circle from one dashboard.
-      </p>
-    </article>
-
-    <article>
-      <div class="step-icon">02</div>
-      <h3>Choose your circle</h3>
-      <p>
-        Select a contribution from $5 through $100 USD in $5 increments.
-      </p>
-    </article>
-
-    <article>
-      <div class="step-icon">03</div>
-      <h3>Reserve your date</h3>
-      <p>
-        Pick an available scheduled payout date in your circle.
-      </p>
-    </article>
-
-    <article>
-      <div class="step-icon">04</div>
-      <h3>Complete the circle</h3>
-      <p>
-        When the required number of payments for the circle are confirmed,
-        payouts follow the schedule.
-      </p>
-    </article>
-
-  </div>
-
-</section>
-
-
-<!-- =========================
-     STATS
-========================= -->
-
-<section class="stats">
-
-  <div class="stats-photo">
-
-    <div class="photo-label">
-      FINANCIAL FREEDOM<br>
-      <em>TOGETHER</em>
-    </div>
-
-  </div>
-
-  <div class="stats-main">
-
-    <div class="eyebrow">
-      REAL PEOPLE. REAL PROGRESS.
-    </div>
-
-    <div class="stat-grid">
-
-      <div>
-        <strong>1,200+</strong>
-        <span>Total members</span>
-      </div>
-
-      <div>
-        <strong>12</strong>
-        <span>Active circles</span>
-      </div>
-
-      <div>
-        <strong>$48K+</strong>
-        <span>Total payouts</span>
-      </div>
-
-      <div>
-        <strong>100%</strong>
-        <span>Ledger tracked</span>
-      </div>
-
-    </div>
-
-    <div class="quote">
-
-      <div class="avatar">
-        SR
-      </div>
-
-      <div>
-        <p>
-          “I choose my date, make my contribution,
-          and always know where I stand.”
-        </p>
-
-        <small>
-          — PayaCircle member
-        </small>
-      </div>
-
-      <div class="stars">
-        ★★★★★
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<!-- =========================
-     APP PROMO
-========================= -->
-
-<section class="app-promo">
-
-  <div>
-
-    <div class="eyebrow">
-      YOUR CIRCLE, ON THE GO
-    </div>
-
-    <h2>
-      Stay in control from anywhere.
-    </h2>
-
-    <p>
-      Track your balance, payment status, circle progress and upcoming
-      scheduled payout from a clean member dashboard.
-    </p>
-
-    <button
-      class="cta"
-      onclick="showRegister()"
-    >
-      Create your account →
-    </button>
-
-  </div>
-
-  <div class="phone">
-
-    <div class="notch"></div>
-
-    <div class="phone-screen">
-
-      <div class="phone-brand">
-        PayaCircle
-      </div>
-
-      <small>
-        Good morning 👋
-      </small>
-
-      <h3>
-        $35.00
-      </h3>
-
-      <div class="phone-box">
-
-        <span>
-          My Circle
-        </span>
-
-        <b>
-          Example: $25 / week
-        </b>
-
-        <small>
-          Next payout · Oct 16
-        </small>
-
-      </div>
-
-      <div class="phone-line">
-
-        <span>
-          87 / 100 paid
-        </span>
-
-        <b></b>
-
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<!-- =========================
-     SECURITY
-========================= -->
-
-<section id="security" class="security">
-
-  <div class="section-head center">
-
-    <div class="eyebrow">
-      SECURITY & TRANSPARENCY
-    </div>
-
-    <h2>
-      Built for responsible money movement.
-    </h2>
-
-    <p>
-      Production controls are designed to keep payment records,
-      member status and scheduled dates consistent.
-    </p>
-
-  </div>
-
-  <div class="security-grid">
-
-    <div>
-      <b>01</b>
-      <h3>Server-side payments</h3>
-      <p>
-        PayPal credentials stay off the browser and are handled by the server.
-      </p>
-    </div>
-
-    <div>
-      <b>02</b>
-      <h3>Verified transaction ledger</h3>
-      <p>
-        Circle membership and payment states are tracked independently
-        from the interface.
-      </p>
-    </div>
-
-    <div>
-      <b>03</b>
-      <h3>Locked payout dates</h3>
-      <p>
-        Each scheduled date can be reserved only once within a circle.
-      </p>
-    </div>
-
-    <div>
-      <b>04</b>
-      <h3>Audit-ready records</h3>
-      <p>
-        Payment and payout actions can be recorded for reconciliation
-        and review.
-      </p>
-    </div>
-
-  </div>
-
-</section>
-
-
-<!-- =========================
-     FINAL CTA
-========================= -->
-
-<section class="final-cta" id="about">
-
-  <div>
-
-    <div class="eyebrow">
-      READY WHEN YOU ARE
-    </div>
-
-    <h2>
-      Save with a plan you can see.
-    </h2>
-
-    <p>
-      Explore the circles, choose your level and reserve
-      an available scheduled payout date.
-    </p>
-
-  </div>
-
-  <button
-    class="cta"
-    onclick="showRegister()"
-  >
-    Get started →
-  </button>
-
-</section>
-
-
-<!-- =========================
-     MEMBER DASHBOARD
-     Hidden until signed in
-========================= -->
-
-<section
-  id="dashboard"
-  class="dashboard"
-  style="display:none;"
->
-
-  <div class="dashboard-head">
-
-    <div>
-
-      <div class="eyebrow">
-        MEMBER ACCOUNT
-      </div>
-
-      <h1>
-        Welcome, <span id="dashboardName">Member</span>
-      </h1>
-
-      <p>
-        Manage your savings circles, contributions and scheduled payouts.
-      </p>
-
-    </div>
-
-    <button
-      id="dashboardLogout"
-      class="ghost"
-    >
-      Sign out
-    </button>
-
-  </div>
-
-
-  <!-- ACCOUNT SUMMARY -->
-
-  <div class="dashboard-summary">
-
-    <div class="dashboard-card">
-
-      <small>
-        ACCOUNT
-      </small>
-
-      <strong id="dashboardEmail">
-        —
-      </strong>
-
-      <span>
-        Member account
-      </span>
-
-    </div>
-
-
-    <div class="dashboard-card">
-
-      <small>
-        ACTIVE CIRCLES
-      </small>
-
-      <strong id="dashboardCircleCount">
-        0
-      </strong>
-
-      <span>
-        Current memberships
-      </span>
-
-    </div>
-
-
-    <div class="dashboard-card">
-
-      <small>
-        CONTRIBUTIONS
-      </small>
-
-      <strong id="dashboardContributions">
-        $0
-      </strong>
-
-      <span>
-        Confirmed payments
-      </span>
-
-    </div>
-
-
-    <div class="dashboard-card">
-
-      <small>
-        NEXT PAYOUT
-      </small>
-
-      <strong id="dashboardNextPayout">
-        —
-      </strong>
-
-      <span>
-        Scheduled date
-      </span>
-
-    </div>
-
-  </div>
-
-
-  <!-- JOIN / CREATE -->
-
-  <div class="dashboard-section">
-
-    <div class="dashboard-section-head">
-
-      <div>
-        <div class="eyebrow">
-          SAVINGS CIRCLES
-        </div>
-
-        <h2>
-          Choose a plan
-        </h2>
-
-        <p>
-          Select a circle and contribution level that fits your savings goal.
-        </p>
-      </div>
-
-      <button
-        id="dashboardCreateCircle"
-        class="primary"
-      >
-        Create a circle
-      </button>
-
-    </div>
-
-    <div
-      id="dashboardCircles"
-      class="cards"
-    ></div>
-
-  </div>
-
-
-  <!-- MY MEMBERSHIPS -->
-
-  <div class="dashboard-section">
-
-    <div class="eyebrow">
-      MY SAVINGS
-    </div>
-
-    <h2>
-      My circles
-    </h2>
-
-    <p>
-      View your contribution status, payout date and payment status.
-    </p>
-
-    <div
-      id="myMemberships"
-      class="dashboard-memberships"
-    ></div>
-
-  </div>
-
-
-  <!-- PAYMENT AREA -->
-
-  <div
-    id="paymentPanel"
-    class="dashboard-payment"
-    style="display:none;"
-  >
-
-    <div class="eyebrow">
-      COMPLETE CONTRIBUTION
-    </div>
-
-    <h2>
-      Review your contribution
-    </h2>
-
-    <div id="paymentDetails"></div>
-
-    <div class="payment-actions">
-
-      <button
-        id="paypalButton"
-        class="primary paypal-button"
-      >
-        Pay with PayPal
-      </button>
-
-      <button
-        id="cancelPayment"
-        class="ghost"
-      >
-        Cancel
-      </button>
-
-    </div>
-
-    <p class="payment-note">
-      Your membership will remain payment-pending until the payment
-      is successfully confirmed.
-    </p>
-
-  </div>
-
-
-  <!-- PAYMENT CONFIRMATION -->
-
-  <div
-    id="paymentSuccess"
-    class="dashboard-success"
-    style="display:none;"
-  >
-
-    <div class="success-icon">
-      ✓
-    </div>
-
-    <div>
-
-      <div class="eyebrow">
-        PAYMENT CONFIRMED
-      </div>
-
-      <h2>
-        Your contribution was received.
-      </h2>
-
-      <p>
-        Your PayaCircle membership has been updated.
-        Your scheduled payout information is now shown in your dashboard.
-      </p>
-
-    </div>
-
-  </div>
-
-</section>
-
-</main>
-
-
-<!-- =========================
-     FOOTER
-========================= -->
-
-<footer>
-
-  <div class="footer-brand">
-
-    <span class="brandmark">
-      C
-    </span>
-
-    <div>
-      <b>
-        PayaCircle
-      </b>
-
-      <small>
-        Save Together. Grow Together.
-      </small>
-    </div>
-
-  </div>
-
-
-  <div class="footer-links">
-
-    <a href="#circles">
-      Circles
-    </a>
-
-    <a href="#how">
-      How it works
-    </a>
-
-    <a href="#security">
-      Security
-    </a>
-
-    <a href="#about">
-      About
-    </a>
-
-    <a href="#">
-      Contact
-    </a>
-
-  </div>
-
-
-  <div class="footer-note">
-
-    © 2026 PayaCircle.
-    Production scaffold — live money remains disabled until
-    configuration, webhook verification and compliance review are complete.
-
-  </div>
-
-</footer>
-
-
-<!-- =========================
-     MODAL
-========================= -->
-
-<div
-  id="modal"
-  class="modal"
->
-
-  <div class="modalbox">
-
-    <button
-      class="x"
-      onclick="hideModal()"
-    >
-      ×
-    </button>
-
-    <div id="modalContent"></div>
-
-  </div>
-
-</div>
-
-
-<script src="/app.js"></script>
-
-</body>
-</html>
+Redesign PayaCircle into a modern, premium, secure member savings platform.
+
+The public homepage and authenticated member account must feel like two separate experiences.
+
+PUBLIC WEBSITE:
+- Keep the existing PayaCircle branding.
+- Keep the public homepage, hero section, circles information, how-it-works, security section and Get Started / Sign In actions.
+- Do not show the member dashboard underneath the public homepage.
+- When a user signs in successfully, transition them into a dedicated authenticated account area.
+- When they sign out, return them to the public homepage.
+
+AUTHENTICATED MEMBER AREA:
+Create a complete "My PayaCircle" account experience inspired by the organization, usability and comfort of modern accounts such as Wayfair's My Account area, but do not copy Wayfair's branding or design.
+
+The member area should include:
+
+1. ACCOUNT HEADER
+- PayaCircle logo/brand
+- "My PayaCircle"
+- Member name
+- Member email
+- Notifications icon
+- Profile/account menu
+- Secure account indicator
+- Sign Out
+
+2. ACCOUNT NAVIGATION
+Desktop:
+- Overview
+- My Circles
+- Contributions
+- Payouts
+- Payment Methods
+- Profile & Settings
+- Security
+- Help & Support
+
+Mobile:
+- Home
+- Circles
+- Payments
+- Payouts
+- Account
+
+3. OVERVIEW DASHBOARD
+Create attractive visual cards for:
+- Total Savings
+- Available Balance
+- Next Payout
+- Active Circles
+
+Include:
+- Savings progress visualization
+- Upcoming payout section
+- Recent transactions
+- Active savings circles
+- Quick actions
+- Join a Circle
+- Create a Circle
+- Make a Contribution
+- View Payouts
+
+Do not display account numbers, balances or financial figures as random plain text. Use polished cards, spacing, typography, icons and clear hierarchy.
+
+4. MY CIRCLES
+Each circle should have a modern card containing:
+- Circle name
+- Circle type
+- Contribution amount
+- Member count
+- User's payout date
+- Payment status
+- Circle progress
+- Payout status
+- View Circle button
+
+5. CONTRIBUTIONS
+Create a transaction-style page showing:
+- Contribution amount
+- Circle
+- Date
+- Payment method
+- Payment status
+- PayPal transaction reference when available
+
+Use clear status badges such as:
+Paid
+Pending
+Failed
+Refunded
+
+6. PAYOUTS
+Show:
+- Upcoming payout
+- Payout amount
+- Scheduled date
+- Circle
+- Payout status
+- Previous payouts
+
+Use a visual timeline where appropriate.
+
+7. PAYMENT METHODS
+Create a secure-looking payment section for PayPal.
+Do not display PayPal secrets or sensitive credentials.
+Show connected/payment status and appropriate PayPal actions.
+
+8. PROFILE & SETTINGS
+Allow the interface to display:
+- Name
+- Email
+- PayPal email
+- Account preferences
+- Notification preferences
+
+9. SECURITY
+Include:
+- Password/security section
+- Secure session indicator
+- Account protection information
+- Sign-out-all-sessions style UI if backend support is added later
+- Never expose passwords, JWT secrets, PayPal secrets or database credentials.
+
+10. HELP & SUPPORT
+Create a clean support section with:
+- Frequently asked questions
+- Contact support
+- Payment help
+- Circle help
+- Payout help
+
+DESIGN:
+- Modern fintech/e-commerce account dashboard.
+- Premium but approachable.
+- Spacious layout.
+- Rounded cards.
+- Subtle shadows.
+- Excellent typography hierarchy.
+- Professional buttons.
+- Attractive icons.
+- Responsive on iPhone, Android, tablet and desktop.
+- Comfortable touch targets.
+- Clear empty states.
+- Loading states.
+- Success states.
+- Error states.
+- Avoid walls of plain text.
+- Avoid making the interface look like a basic HTML form.
+- Keep the design consistent with the existing PayaCircle branding.
+- Use CSS rather than external UI frameworks unless already installed.
+- Do not break existing functionality.
+
+SECURITY/FUNCTIONAL REQUIREMENTS:
+- Preserve existing registration.
+- Preserve existing login.
+- Preserve existing logout.
+- Preserve existing authentication cookie.
+- Preserve existing Postgres/Prisma functionality.
+- Preserve existing savings-circle functionality.
+- Preserve PayPal Sandbox integration.
+- Never put secrets in frontend JavaScript.
+- Never display JWT_SECRET, DATABASE_URL, PAYPAL_CLIENT_SECRET or other secrets.
+- Authenticated API data must continue to come from the backend.
+- Do not fake successful payments.
+- PayPal payment status must continue to be confirmed by the backend.
+- Keep the application compatible with the existing Railway deployment.
+
+IMPLEMENTATION:
+Do not try to change every file at once.
+Implement the redesign in this order:
+
+STEP 1:
+public/index.html — create the complete structure for the new authenticated member account.
+
+STEP 2:
+public/app.css — create the complete modern responsive visual design.
+
+STEP 3:
+public/app.js — connect the new account navigation, dashboard cards, circles, contributions, payouts, profile and existing PayPal functionality to the backend.
+
+STEP 4:
+src/server.js — only make backend changes that are genuinely required for the new account functionality.
+
+STEP 5:
+Test registration, login, logout, dashboard loading, circles, membership selection and PayPal Sandbox.
+
+For each step, provide one complete replacement file only. Do not provide partial snippets. Do not change unrelated files.
