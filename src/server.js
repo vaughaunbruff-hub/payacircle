@@ -15,15 +15,7 @@ dotenv.config();
 const prisma = new PrismaClient();
 const app = express();
 
-/* --------------------------------
-   RAILWAY / PROXY
---------------------------------- */
-
 app.set("trust proxy", 1);
-
-/* --------------------------------
-   SECURITY
---------------------------------- */
 
 app.use(
   helmet({
@@ -43,15 +35,7 @@ app.use(
   })
 );
 
-/* --------------------------------
-   STATIC WEBSITE
---------------------------------- */
-
 app.use(express.static("public"));
-
-/* --------------------------------
-   CONFIG
---------------------------------- */
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -468,7 +452,169 @@ app.get(
 );
 
 /* --------------------------------
-   CIRCLE PLAN REQUIREMENTS
+   CANCEL MEMBERSHIP
+--------------------------------- */
+
+app.post(
+  "/api/memberships/:id/cancel",
+  auth,
+  async (req, res) => {
+    const membershipId = req.params.id;
+
+    try {
+      const result =
+        await prisma.$transaction(
+          async (tx) => {
+            const membership =
+              await tx.membership.findUnique({
+                where: {
+                  id: membershipId
+                },
+                include: {
+                  circle: true,
+                  payoutDate: true
+                }
+              });
+
+            if (!membership) {
+              throw new Error(
+                "Membership not found"
+              );
+            }
+
+            if (
+              membership.userId !==
+              req.user.id
+            ) {
+              const error = new Error(
+                "You cannot cancel this membership"
+              );
+
+              error.status = 403;
+              throw error;
+            }
+
+            if (
+              membership.status ===
+                "CANCELLED" ||
+              membership.status ===
+                "REFUNDED"
+            ) {
+              throw new Error(
+                "This membership has already been cancelled"
+              );
+            }
+
+            /*
+              A member can only cancel while
+              the circle is still collecting
+              members.
+
+              Once the circle has moved beyond
+              COLLECTING, cancellation is blocked.
+            */
+
+            if (
+              membership.circle.status !==
+              "COLLECTING"
+            ) {
+              throw new Error(
+                "This circle has already started and can no longer be cancelled"
+              );
+            }
+
+            /*
+              Paid memberships are not
+              automatically refunded here.
+              The payment/refund process must
+              be handled separately.
+            */
+
+            const hasCapturedPayment =
+              await tx.payment.findFirst({
+                where: {
+                  membershipId:
+                    membership.id,
+                  status: "CAPTURED"
+                }
+              });
+
+            if (hasCapturedPayment) {
+              const error = new Error(
+                "This membership has already been paid. Please contact PayaCircle support to request a refund."
+              );
+
+              error.status = 409;
+              throw error;
+            }
+
+            const updated =
+              await tx.membership.update({
+                where: {
+                  id: membership.id
+                },
+                data: {
+                  status: "CANCELLED"
+                },
+                include: {
+                  circle: true,
+                  payoutDate: true
+                }
+              });
+
+            /*
+              Release the payout-date reservation.
+            */
+
+            await tx.payoutDate.update({
+              where: {
+                id: membership.payoutDateId
+              },
+              data: {
+                reserved: {
+                  decrement: 1
+                }
+              }
+            });
+
+            return updated;
+          }
+        );
+
+      res.json({
+        ok: true,
+        message:
+          "Your circle membership has been cancelled.",
+        membership: result
+      });
+    } catch (error) {
+      const status =
+        error?.status ||
+        (error?.message?.includes(
+          "not found"
+        )
+          ? 404
+          : error?.message?.includes(
+              "cannot be cancelled"
+            )
+          ? 409
+          : error?.message?.includes(
+              "already been cancelled"
+            )
+          ? 409
+          : 400);
+
+      res.status(status).json({
+        error:
+          error?.message ||
+          "Unable to cancel membership"
+      });
+    }
+  }
+);
+
+/* --------------------------------
+   CREATE CIRCLE
 --------------------------------- */
 
 const PLAN_MIN = {
@@ -477,10 +623,6 @@ const PLAN_MIN = {
   SOCIAL_MEDIA: 5,
   CUSTOM: 2
 };
-
-/* --------------------------------
-   CREATE CIRCLE
---------------------------------- */
 
 app.post(
   "/api/circles",
@@ -679,6 +821,37 @@ app.post(
               });
 
             if (existing) {
+              if (
+                existing.status ===
+                "CANCELLED"
+              ) {
+                await tx.payoutDate.update({
+                  where: {
+                    id: existing.payoutDateId
+                  },
+                  data: {
+                    reserved: {
+                      increment: 1
+                    }
+                  }
+                });
+
+                return tx.membership.update({
+                  where: {
+                    id: existing.id
+                  },
+                  data: {
+                    payoutDateId,
+                    status:
+                      "PAYMENT_PENDING"
+                  },
+                  include: {
+                    circle: true,
+                    payoutDate: true
+                  }
+                });
+              }
+
               return existing;
             }
 
@@ -917,7 +1090,8 @@ app.post(
         req.user.id
       ) {
         return res.status(403).json({
-          error: "Payment does not belong to this account"
+          error:
+            "Payment does not belong to this account"
         });
       }
 
@@ -1102,12 +1276,6 @@ app.post(
 app.post(
   "/api/paypal/webhook",
   async (req, res) => {
-    /*
-      Webhook events are intentionally not
-      trusted here until PayPal webhook
-      signature verification is configured.
-    */
-
     console.log(
       "PayPal webhook received:",
       req.body?.event_type || "unknown"
