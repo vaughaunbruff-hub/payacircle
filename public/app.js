@@ -1,85 +1,17 @@
 const API = "/api";
 
 let currentUser = null;
-let currentMembership = null;
 let currentCircle = null;
-let currentPayoutDate = null;
-let paypalReturnHandled = false;
 
-const $ = (selector, root = document) => {
-  try {
-    return root.querySelector(selector);
-  } catch {
-    return null;
-  }
-};
+/* --------------------------------
+   HELPERS
+--------------------------------- */
 
-const $$ = (selector, root = document) => {
-  try {
-    return Array.from(root.querySelectorAll(selector));
-  } catch {
-    return [];
-  }
-};
+const $ = (selector) =>
+  document.querySelector(selector);
 
-async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
-  });
-
-  let data = null;
-
-  try {
-    data = await response.json();
-  } catch {
-    data = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(data.error || data.message || `Request failed (${response.status})`);
-  }
-
-  return data;
-}
-
-function money(cents) {
-  return `$${((Number(cents) || 0) / 100).toFixed(2)}`;
-}
-
-function formatDate(value) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
-}
-
-function formatDateTime(value) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}
+const $$ = (selector) =>
+  Array.from(document.querySelectorAll(selector));
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -90,190 +22,179 @@ function escapeHTML(value) {
     .replace(/'/g, "&#039;");
 }
 
-function initials(name) {
-  const value = String(name || "Member").trim();
+function money(cents) {
+  return `$${(
+    Number(cents || 0) / 100
+  ).toFixed(2)}`;
+}
 
-  if (!value) return "M";
+function formatDate(value) {
+  if (!value) return "Not available";
 
-  const parts = value.split(/\s+/);
+  const date = new Date(value);
 
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
   }
 
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
-function humanize(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, char => char.toUpperCase());
-}
-
-function getTypeLabel(type) {
-  const labels = {
-    FAMILY: "Family",
-    FRIENDS: "Friends",
-    SOCIAL_MEDIA: "Social Media",
-    CUSTOM: "Custom"
-  };
-
-  return labels[type] || humanize(type);
-}
-
-function getStatusClass(status) {
-  const value = String(status || "").toLowerCase();
-
-  if (
-    value.includes("paid") ||
-    value.includes("approved") ||
-    value.includes("captured") ||
-    value.includes("completed")
-  ) {
-    return "success";
-  }
-
-  if (
-    value.includes("pending") ||
-    value.includes("scheduled") ||
-    value.includes("reserved")
-  ) {
-    return "pending";
-  }
-
-  if (
-    value.includes("failed") ||
-    value.includes("cancel") ||
-    value.includes("refund")
-  ) {
-    return "danger";
-  }
-
-  return "secure";
-}
-
-function getStatusLabel(status) {
-  return humanize(status);
-}
-
-function showToast(message, type = "info") {
-  let toast = $("#pcToast");
-
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "pcToast";
-    toast.className = "pc-toast";
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = message;
-  toast.dataset.type = type;
-  toast.classList.add("show");
-
-  clearTimeout(window.__pcToastTimer);
-
-  window.__pcToastTimer = setTimeout(() => {
-    toast.classList.remove("show");
-  }, 3500);
-}
-
-function setLoading(button, loading, text = "Please wait...") {
-  if (!button) return;
-
-  if (loading) {
-    if (!button.dataset.originalText) {
-      button.dataset.originalText = button.textContent;
+  return date.toLocaleDateString(
+    undefined,
+    {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
     }
+  );
+}
 
-    button.disabled = true;
-    button.textContent = text;
-  } else {
-    button.disabled = false;
+function formatDateTime(value) {
+  if (!value) return "Not available";
 
-    if (button.dataset.originalText) {
-      button.textContent = button.dataset.originalText;
-      delete button.dataset.originalText;
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
+  }
+
+  return date.toLocaleString(
+    undefined,
+    {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
     }
+  );
+}
+
+/* --------------------------------
+   API
+--------------------------------- */
+
+async function api(path, options = {}) {
+  const response = await fetch(
+    `${API}${path}`,
+    {
+      credentials: "include",
+      headers: {
+        "Content-Type":
+          "application/json",
+        ...(options.headers || {})
+      },
+      ...options
+    }
+  );
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+        data.message ||
+        `Request failed (${response.status})`
+    );
+  }
+
+  return data;
+}
+
+/* --------------------------------
+   ELEMENT VISIBILITY
+--------------------------------- */
+
+function show(element) {
+  if (element) {
+    element.hidden = false;
+    element.style.display = "";
   }
 }
 
+function hide(element) {
+  if (element) {
+    element.hidden = true;
+    element.style.display = "none";
+  }
+}
 
-/* =========================================================
+/* --------------------------------
    AUTH MODAL
-   ========================================================= */
+--------------------------------- */
 
-function openAuthModal(mode = "register") {
-  const modal = $("#authModal");
+function openAuthModal(mode = "login") {
+  const modal =
+    $("#authModal");
 
   if (!modal) return;
 
-  modal.style.display = "flex";
-  modal.classList.add("open");
+  show(modal);
 
-  if (mode === "login") {
-    openLogin();
-  } else {
+  if (mode === "register") {
     openRegister();
+  } else {
+    openLogin();
   }
 }
 
 function closeAuthModal() {
-  const modal = $("#authModal");
+  const modal =
+    $("#authModal");
 
   if (!modal) return;
 
-  modal.style.display = "none";
-  modal.classList.remove("open");
-}
-
-function openRegister() {
-  const registerForm = $("#registerForm");
-  const loginForm = $("#loginForm");
-  const registerTab = $("#registerTab");
-  const loginTab = $("#loginTab");
-  const title = $("#authModalTitle");
-
-  if (registerForm) registerForm.style.display = "block";
-  if (loginForm) loginForm.style.display = "none";
-
-  if (registerTab) registerTab.classList.add("active");
-  if (loginTab) loginTab.classList.remove("active");
-
-  if (title) title.textContent = "Create your account";
-
-  openAuthModalWithoutRecursion();
+  hide(modal);
 }
 
 function openLogin() {
-  const registerForm = $("#registerForm");
-  const loginForm = $("#loginForm");
-  const registerTab = $("#registerTab");
-  const loginTab = $("#loginTab");
-  const title = $("#authModalTitle");
+  const login =
+    $("#loginForm");
 
-  if (registerForm) registerForm.style.display = "none";
-  if (loginForm) loginForm.style.display = "block";
+  const register =
+    $("#registerForm");
 
-  if (registerTab) registerTab.classList.remove("active");
-  if (loginTab) loginTab.classList.add("active");
+  if (login) show(login);
+  if (register) hide(register);
 
-  if (title) title.textContent = "Sign in to your account";
+  const title =
+    $("#authModalTitle");
 
-  openAuthModalWithoutRecursion();
+  if (title) {
+    title.textContent =
+      "Welcome back";
+  }
 }
 
-function openAuthModalWithoutRecursion() {
-  const modal = $("#authModal");
+function openRegister() {
+  const login =
+    $("#loginForm");
 
-  if (!modal) return;
+  const register =
+    $("#registerForm");
 
-  modal.style.display = "flex";
-  modal.classList.add("open");
+  if (login) hide(login);
+  if (register) show(register);
+
+  const title =
+    $("#authModalTitle");
+
+  if (title) {
+    title.textContent =
+      "Create your account";
+  }
 }
+
+/* --------------------------------
+   AUTH BUTTONS
+--------------------------------- */
 
 function bindAuthButtons() {
-  const loginButtons = [
+  const signInButtons = [
     "#headerSignIn",
     "#heroSignIn",
     "#footerSignIn"
@@ -286,206 +207,191 @@ function bindAuthButtons() {
     "#finalGetStarted"
   ];
 
-  loginButtons.forEach(selector => {
-    const button = $(selector);
+  signInButtons.forEach(
+    (selector) => {
+      const button = $(selector);
 
-    if (!button) return;
+      if (!button) return;
 
-    button.addEventListener("click", event => {
-      event.preventDefault();
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault();
+          openAuthModal("login");
+        }
+      );
+    }
+  );
 
-      if (currentUser) {
-        showDashboard();
-      } else {
-        openLogin();
-      }
-    });
-  });
+  registerButtons.forEach(
+    (selector) => {
+      const button = $(selector);
 
-  registerButtons.forEach(selector => {
-    const button = $(selector);
+      if (!button) return;
 
-    if (!button) return;
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault();
+          openAuthModal("register");
+        }
+      );
+    }
+  );
 
-    button.addEventListener("click", event => {
-      event.preventDefault();
+  const close =
+    $("#closeAuthModal");
 
-      if (currentUser) {
-        showDashboard();
-      } else {
-        openRegister();
-      }
-    });
-  });
-
-  const closeButton = $("#closeAuthModal");
-
-  if (closeButton) {
-    closeButton.addEventListener("click", event => {
-      event.preventDefault();
-      closeAuthModal();
-    });
+  if (close) {
+    close.addEventListener(
+      "click",
+      closeAuthModal
+    );
   }
 
-  const registerTab = $("#registerTab");
+  const switchLogin =
+    $("#switchToLogin");
 
-  if (registerTab) {
-    registerTab.addEventListener("click", event => {
-      event.preventDefault();
-      openRegister();
-    });
+  if (switchLogin) {
+    switchLogin.addEventListener(
+      "click",
+      openLogin
+    );
   }
 
-  const loginTab = $("#loginTab");
+  const switchRegister =
+    $("#switchToRegister");
 
-  if (loginTab) {
-    loginTab.addEventListener("click", event => {
-      event.preventDefault();
-      openLogin();
-    });
-  }
-
-  const modal = $("#authModal");
-
-  if (modal) {
-    modal.addEventListener("click", event => {
-      if (event.target === modal) {
-        closeAuthModal();
-      }
-    });
+  if (switchRegister) {
+    switchRegister.addEventListener(
+      "click",
+      openRegister
+    );
   }
 }
 
-
-/* =========================================================
+/* --------------------------------
    REGISTER
-   ========================================================= */
+--------------------------------- */
 
-async function register(event) {
+async function registerUser(event) {
   event.preventDefault();
 
-  const form = event.currentTarget;
-  const button = form.querySelector('button[type="submit"]');
-  const message = $("#registerMessage");
+  const form =
+    event.currentTarget;
 
-  const name = $("#registerName")?.value.trim();
-  const email = $("#registerEmail")?.value.trim();
-  const password = $("#registerPassword")?.value;
+  const name =
+    form.querySelector(
+      '[name="name"]'
+    )?.value
+      ?.trim();
+
+  const email =
+    form.querySelector(
+      '[name="email"]'
+    )?.value
+      ?.trim();
+
+  const password =
+    form.querySelector(
+      '[name="password"]'
+    )?.value || "";
+
+  const message =
+    $("#registerMessage");
 
   if (!name || !email || !password) {
     if (message) {
-      message.textContent = "Please complete all fields.";
-      message.className = "form-message error";
+      message.textContent =
+        "Please complete all fields.";
     }
-
     return;
   }
 
-  setLoading(button, true, "Creating account...");
-
-  if (message) {
-    message.textContent = "";
-    message.className = "form-message";
-  }
-
   try {
-    const data = await api("/register", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        email,
-        password
-      })
-    });
+    const data =
+      await api("/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          email,
+          password
+        })
+      });
 
     if (message) {
-      message.textContent = data.message || "Account created successfully.";
-      message.className = "form-message success";
+      message.textContent =
+        "Account created successfully.";
     }
 
-    await loadCurrentUser();
+    currentUser = data;
 
     closeAuthModal();
 
-    if (currentUser) {
-      showDashboard();
-    }
+    await loadAccount();
   } catch (error) {
     if (message) {
-      message.textContent = error.message;
-      message.className = "form-message error";
+      message.textContent =
+        error.message;
     }
-  } finally {
-    setLoading(button, false);
   }
 }
 
-
-/* =========================================================
+/* --------------------------------
    LOGIN
-   ========================================================= */
+--------------------------------- */
 
-async function login(event) {
+async function loginUser(event) {
   event.preventDefault();
 
-  const form = event.currentTarget;
-  const button = form.querySelector('button[type="submit"]');
-  const message = $("#loginMessage");
+  const form =
+    event.currentTarget;
 
-  const email = $("#loginEmail")?.value.trim();
-  const password = $("#loginPassword")?.value;
+  const email =
+    form.querySelector(
+      '[name="email"]'
+    )?.value
+      ?.trim();
 
-  if (!email || !password) {
-    if (message) {
-      message.textContent = "Please enter your email and password.";
-      message.className = "form-message error";
-    }
+  const password =
+    form.querySelector(
+      '[name="password"]'
+    )?.value || "";
 
-    return;
-  }
-
-  setLoading(button, true, "Signing in...");
-
-  if (message) {
-    message.textContent = "";
-    message.className = "form-message";
-  }
+  const message =
+    $("#loginMessage");
 
   try {
-    const data = await api("/login", {
-      method: "POST",
-      body: JSON.stringify({
-        email,
-        password
-      })
-    });
+    const data =
+      await api("/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          password
+        })
+      });
 
     if (message) {
-      message.textContent = data.message || "Signed in successfully.";
-      message.className = "form-message success";
+      message.textContent =
+        "Signed in successfully.";
     }
 
-    await loadCurrentUser();
+    currentUser = data;
 
     closeAuthModal();
 
-    if (currentUser) {
-      showDashboard();
-    }
+    await loadAccount();
   } catch (error) {
     if (message) {
-      message.textContent = error.message;
-      message.className = "form-message error";
+      message.textContent =
+        error.message;
     }
-  } finally {
-    setLoading(button, false);
   }
 }
 
-
-/* =========================================================
+/* --------------------------------
    LOGOUT
-   ========================================================= */
+--------------------------------- */
 
 async function logout() {
   try {
@@ -493,173 +399,40 @@ async function logout() {
       method: "POST"
     });
   } catch {
-    // Continue to clear the local session even if the request fails.
+    // Continue clearing local account state.
   }
 
   currentUser = null;
-  currentMembership = null;
   currentCircle = null;
-  currentPayoutDate = null;
 
-  hideDashboard();
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-
-  showToast("You have been signed out.", "success");
+  showPublicSite();
 }
 
-
-/* =========================================================
-   DASHBOARD VISIBILITY
-   ========================================================= */
-
-function hideDashboard() {
-  const dashboard = $("#dashboard");
-  const publicSite = $("#publicSite");
-
-  if (dashboard) dashboard.style.display = "none";
-  if (publicSite) publicSite.style.display = "";
-
-  document.body.classList.remove("account-view");
-}
-
-function showDashboardElements() {
-  const dashboard = $("#dashboard");
-  const publicSite = $("#publicSite");
-
-  if (publicSite) publicSite.style.display = "none";
-
-  if (dashboard) {
-    dashboard.style.display = "block";
-  }
-
-  document.body.classList.add("account-view");
-}
-
-async function showDashboard() {
-  if (!currentUser) {
-    openLogin();
-    return;
-  }
-
-  showDashboardElements();
-
-  await refreshDashboard();
-
-  activateAccountPanel("overview");
-}
-
-
-/* =========================================================
+/* --------------------------------
    CURRENT USER
-   ========================================================= */
+--------------------------------- */
 
-async function loadCurrentUser() {
+async function getCurrentUser() {
   try {
-    const data = await api("/me");
-
-    currentUser = data.user || data;
-
-    return currentUser;
+    return await api("/me");
   } catch {
-    currentUser = null;
     return null;
   }
 }
 
+/* --------------------------------
+   PUBLIC / ACCOUNT VIEWS
+--------------------------------- */
 
-/* =========================================================
-   DASHBOARD USER DISPLAY
-   ========================================================= */
+function showPublicSite() {
+  const publicSite =
+    $("#publicSite");
 
-function renderUserInformation() {
-  if (!currentUser) return;
+  const dashboard =
+    $("#accountDashboard");
 
-  const name = currentUser.name || "Member";
-  const email = currentUser.email || "—";
-  const userInitials = initials(name);
-
-  const nameTargets = [
-    "#dashboardUserName",
-    "#profileMenuName",
-    "#profileName"
-  ];
-
-  nameTargets.forEach(selector => {
-    const element = $(selector);
-
-    if (element) {
-      element.textContent = name;
-    }
-  });
-
-  const emailTargets = [
-    "#dashboardUserEmail",
-    "#profileMenuEmail",
-    "#profileEmail"
-  ];
-
-  emailTargets.forEach(selector => {
-    const element = $(selector);
-
-    if (element) {
-      element.textContent = email;
-    }
-  });
-
-  const paypalEmail = $("#profilePaypalEmail");
-
-  if (paypalEmail) {
-    paypalEmail.textContent =
-      currentUser.paypalEmail || "Not provided";
-  }
-
-  $$(".dashboardUserInitials").forEach(element => {
-    element.textContent = userInitials;
-  });
-
-  const welcomeName = $("#dashboardWelcomeName");
-
-  if (welcomeName) {
-    welcomeName.textContent = name.split(/\s+/)[0];
-  }
-}
-
-
-/* =========================================================
-   ACCOUNT NAVIGATION
-   ========================================================= */
-
-function activateAccountPanel(panelName) {
-  if (!panelName) panelName = "overview";
-
-  $$(".account-panel").forEach(panel => {
-    const isActive = panel.dataset.panel === panelName;
-
-    panel.classList.toggle("active", isActive);
-    panel.style.display = isActive ? "block" : "none";
-  });
-
-  $$("[data-account-panel]").forEach(button => {
-    button.classList.toggle(
-      "active",
-      button.dataset.accountPanel === panelName
-    );
-  });
-
-  const paymentPanel = $("#paymentPanel");
-  const paymentSuccess = $("#paymentSuccess");
-
-  if (paymentPanel) {
-    paymentPanel.style.display = "none";
-  }
-
-  if (paymentSuccess) {
-    paymentSuccess.style.display = "none";
-  }
+  if (publicSite) show(publicSite);
+  if (dashboard) hide(dashboard);
 
   window.scrollTo({
     top: 0,
@@ -667,218 +440,577 @@ function activateAccountPanel(panelName) {
   });
 }
 
-function bindAccountNavigation() {
-  $$("[data-account-panel]").forEach(button => {
-    button.addEventListener("click", event => {
-      event.preventDefault();
+function showAccountDashboard() {
+  const publicSite =
+    $("#publicSite");
 
-      const panel = button.dataset.accountPanel;
+  const dashboard =
+    $("#accountDashboard");
 
-      if (panel) {
-        activateAccountPanel(panel);
-      }
-    });
+  if (publicSite) hide(publicSite);
+  if (dashboard) show(dashboard);
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
   });
 }
 
+/* --------------------------------
+   LOAD ACCOUNT
+--------------------------------- */
 
-/* =========================================================
-   DASHBOARD REFRESH
-   ========================================================= */
+async function loadAccount() {
+  const user =
+    await getCurrentUser();
 
-async function refreshDashboard() {
-  if (!currentUser) return;
+  if (!user) {
+    currentUser = null;
+    showPublicSite();
+    return;
+  }
 
-  renderUserInformation();
+  currentUser = user;
 
-  await Promise.allSettled([
-    loadMemberships(),
-    loadTransactions(),
-    loadPayouts()
-  ]);
+  showAccountDashboard();
 
-  renderOverview();
+  renderUserInformation(user);
+  renderMemberships(user);
+  renderAccountBalance(user);
+
+  await loadPayments();
+  await loadPayouts();
+
+  activateAccountPanel("overview");
 }
 
+/* --------------------------------
+   USER INFORMATION
+--------------------------------- */
 
-/* =========================================================
-   CIRCLES
-   ========================================================= */
+function renderUserInformation(user) {
+  const nameElements =
+    $$("[data-user-name]");
+
+  nameElements.forEach(
+    (element) => {
+      element.textContent =
+        user.name || "Member";
+    }
+  );
+
+  const emailElements =
+    $$("[data-user-email]");
+
+  emailElements.forEach(
+    (element) => {
+      element.textContent =
+        user.email || "";
+    }
+  );
+}
+
+/* --------------------------------
+   BALANCE
+--------------------------------- */
+
+function renderAccountBalance(user) {
+  const memberships =
+    user.memberships || [];
+
+  const paid =
+    memberships.filter(
+      (membership) =>
+        membership.status ===
+          "PAID" ||
+        membership.status ===
+          "PAYOUT_SCHEDULED"
+    );
+
+  const total =
+    paid.reduce(
+      (sum, membership) =>
+        sum +
+        Number(
+          membership.circle
+            ?.amountCents || 0
+        ),
+      0
+    );
+
+  $$("[data-account-balance]")
+    .forEach(
+      (element) => {
+        element.textContent =
+          money(total);
+      }
+    );
+}
+
+/* --------------------------------
+   MEMBERSHIPS
+--------------------------------- */
+
+function renderMemberships(user) {
+  const container =
+    $("#membershipsList");
+
+  if (!container) return;
+
+  const memberships =
+    user.memberships || [];
+
+  if (!memberships.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">+</div>
+        <strong>No circles yet</strong>
+        <span>Join a savings circle to get started.</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML =
+    memberships
+      .map(
+        (membership) => {
+          const circle =
+            membership.circle || {};
+
+          const payoutDate =
+            membership.payoutDate;
+
+          const canCancel =
+            circle.status ===
+              "COLLECTING" &&
+            ![
+              "CANCELLED",
+              "REFUNDED",
+              "PAID_OUT"
+            ].includes(
+              membership.status
+            );
+
+          return `
+            <article
+              class="account-circle-card"
+              data-membership-id="${escapeHTML(
+                membership.id
+              )}"
+            >
+              <div class="account-circle-main">
+                <div>
+                  <span class="eyebrow">
+                    ${escapeHTML(
+                      circle.type ||
+                        "Circle"
+                    )}
+                  </span>
+
+                  <h3>
+                    ${escapeHTML(
+                      circle.name ||
+                        circle.code ||
+                        "PayaCircle"
+                    )}
+                  </h3>
+
+                  <p>
+                    Contribution:
+                    <strong>
+                      ${money(
+                        circle.amountCents
+                      )}
+                    </strong>
+                  </p>
+
+                  <p>
+                    Payout date:
+                    <strong>
+                      ${
+                        payoutDate
+                          ? formatDate(
+                              payoutDate.payoutAt
+                            )
+                          : "Not selected"
+                      }
+                    </strong>
+                  </p>
+                </div>
+
+                <div class="account-circle-status">
+                  <span class="status-badge status-${escapeHTML(
+                    String(
+                      membership.status ||
+                        ""
+                    ).toLowerCase()
+                  )}">
+                    ${escapeHTML(
+                      prettyStatus(
+                        membership.status
+                      )
+                    )}
+                  </span>
+
+                  <span class="status-badge">
+                    ${escapeHTML(
+                      prettyStatus(
+                        circle.status
+                      )
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div class="account-circle-actions">
+                <button
+                  type="button"
+                  class="secondary circle-view-button"
+                  data-circle-id="${escapeHTML(
+                    circle.id || ""
+                  )}"
+                >
+                  View Circle
+                </button>
+
+                ${
+                  canCancel
+                    ? `
+                      <button
+                        type="button"
+                        class="danger-outline cancel-membership-button"
+                        data-membership-id="${escapeHTML(
+                          membership.id
+                        )}"
+                      >
+                        Cancel Membership
+                      </button>
+                    `
+                    : ""
+                }
+              </div>
+            </article>
+          `;
+        }
+      )
+      .join("");
+
+  $$(".circle-view-button").forEach(
+    (button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          openCircleDetails(
+            button.dataset.circleId
+          );
+        }
+      );
+    }
+  );
+
+  $$(".cancel-membership-button")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          confirmCancellation(
+            button.dataset.membershipId
+          );
+        }
+      );
+    });
+}
+
+/* --------------------------------
+   STATUS
+--------------------------------- */
+
+function prettyStatus(value) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  return String(value)
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
+}
+
+/* --------------------------------
+   CANCEL CONFIRMATION
+--------------------------------- */
+
+function confirmCancellation(
+  membershipId
+) {
+  const membership =
+    currentUser?.memberships?.find(
+      (item) =>
+        item.id === membershipId
+    );
+
+  if (!membership) {
+    alert(
+      "Membership could not be found."
+    );
+    return;
+  }
+
+  const circle =
+    membership.circle || {};
+
+  if (
+    circle.status !==
+    "COLLECTING"
+  ) {
+    alert(
+      "This circle has already started and can no longer be cancelled."
+    );
+    return;
+  }
+
+  const confirmed =
+    window.confirm(
+      `Cancel your membership in "${
+        circle.name ||
+        circle.code ||
+        "this circle"
+      }"?\n\nYour reserved payout-date spot will be released.`
+    );
+
+  if (!confirmed) return;
+
+  cancelMembership(
+    membershipId
+  );
+}
+
+/* --------------------------------
+   CANCEL MEMBERSHIP
+--------------------------------- */
+
+async function cancelMembership(
+  membershipId
+) {
+  const button =
+    document.querySelector(
+      `[data-membership-id="${CSS.escape(
+        membershipId
+      )}"].cancel-membership-button`
+    );
+
+  if (button) {
+    button.disabled = true;
+    button.textContent =
+      "Cancelling...";
+  }
+
+  try {
+    const result =
+      await api(
+        `/memberships/${encodeURIComponent(
+          membershipId
+        )}/cancel`,
+        {
+          method: "POST"
+        }
+      );
+
+    alert(
+      result.message ||
+        "Your membership has been cancelled."
+    );
+
+    currentUser =
+      await getCurrentUser();
+
+    if (!currentUser) {
+      showPublicSite();
+      return;
+    }
+
+    renderUserInformation(
+      currentUser
+    );
+
+    renderMemberships(
+      currentUser
+    );
+
+    renderAccountBalance(
+      currentUser
+    );
+  } catch (error) {
+    alert(
+      error.message ||
+        "Unable to cancel membership."
+    );
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "Cancel Membership";
+    }
+  }
+}
+
+/* --------------------------------
+   PUBLIC CIRCLES
+--------------------------------- */
 
 async function loadPublicCircles() {
-  const container = $("#publicCircles");
+  const container =
+    $("#publicCircles");
 
   if (!container) return;
 
   try {
-    const data = await api("/circles");
-
-    const circles = Array.isArray(data)
-      ? data
-      : data.circles || [];
+    const circles =
+      await api("/circles");
 
     if (!circles.length) {
       container.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">◎</div>
-          <strong>No circles available yet</strong>
+          <strong>No circles available</strong>
           <span>New savings circles will appear here.</span>
         </div>
       `;
-
       return;
     }
 
-    container.innerHTML = circles.map(circle => `
-      <article class="circle-card">
-        <div class="circle-card-top">
-          <span class="circle-type">${escapeHTML(getTypeLabel(circle.type))}</span>
-          <span class="status-badge ${getStatusClass(circle.status)}">
-            ${escapeHTML(humanize(circle.status || "Available"))}
-          </span>
-        </div>
+    container.innerHTML =
+      circles
+        .map(
+          (circle) => `
+            <article class="public-circle-card">
+              <span class="eyebrow">
+                ${escapeHTML(
+                  circle.type ||
+                    "CUSTOM"
+                )}
+              </span>
 
-        <h3>${escapeHTML(circle.name || "Savings Circle")}</h3>
+              <h3>
+                ${escapeHTML(
+                  circle.name ||
+                    circle.code ||
+                    "PayaCircle"
+                )}
+              </h3>
 
-        <div class="circle-card-amount">
-          ${money(circle.amountCents)}
-          <small>contribution</small>
-        </div>
+              <p>
+                Contribution:
+                <strong>
+                  ${money(
+                    circle.amountCents
+                  )}
+                </strong>
+              </p>
 
-        <div class="circle-card-details">
-          <span>${escapeHTML(String(circle.capacity || 0))} members</span>
-          <span>${escapeHTML(String(circle.code || ""))}</span>
-        </div>
+              <p>
+                Members:
+                <strong>
+                  ${
+                    circle._count
+                      ?.memberships ||
+                    0
+                  } / ${
+                    circle.capacity
+                  }
+                </strong>
+              </p>
 
-        <button
-          class="primary full-width public-circle-button"
-          data-circle-id="${escapeHTML(circle.id)}"
-        >
-          View Circle
-        </button>
-      </article>
-    `).join("");
+              <button
+                class="primary full-width public-circle-button"
+                data-circle-id="${escapeHTML(
+                  circle.id
+                )}"
+              >
+                View Circle
+              </button>
+            </article>
+          `
+        )
+        .join("");
 
-    $$(".public-circle-button").forEach(button => {
-      button.addEventListener("click", () => {
-        openCircleDetails(button.dataset.circleId);
-      });
+    $(
+      ".public-circle-button"
+    ).forEach((button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          openCircleDetails(
+            button.dataset.circleId
+          );
+        }
+      );
     });
-  } catch {
+  } catch (error) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">!</div>
         <strong>Unable to load circles</strong>
-        <span>Please try again shortly.</span>
+        <span>${escapeHTML(
+          error.message
+        )}</span>
       </div>
     `;
   }
 }
 
-async function loadCirclesPage() {
-  const container = $("#circlesPageGrid");
+/* --------------------------------
+   CIRCLE DETAILS
+--------------------------------- */
 
-  if (!container) return;
-
-  try {
-    const data = await api("/circles");
-
-    const circles = Array.isArray(data)
-      ? data
-      : data.circles || [];
-
-    if (!circles.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">◎</div>
-          <strong>No circles available</strong>
-          <span>There are currently no savings circles to display.</span>
-        </div>
-      `;
-
-      return;
-    }
-
-    container.innerHTML = circles.map(circle => `
-      <article class="circle-card">
-        <div class="circle-card-top">
-          <span class="circle-type">${escapeHTML(getTypeLabel(circle.type))}</span>
-          <span class="status-badge ${getStatusClass(circle.status)}">
-            ${escapeHTML(humanize(circle.status || "Available"))}
-          </span>
-        </div>
-
-        <h3>${escapeHTML(circle.name || "Savings Circle")}</h3>
-
-        <div class="circle-card-amount">
-          ${money(circle.amountCents)}
-          <small>contribution</small>
-        </div>
-
-        <div class="circle-card-details">
-          <span>Capacity: ${escapeHTML(String(circle.capacity || 0))}</span>
-          <span>${escapeHTML(circle.code || "")}</span>
-        </div>
-
-        <button
-          class="primary full-width join-circle-button"
-          data-circle-id="${escapeHTML(circle.id)}"
-        >
-          Join Circle
-        </button>
-      </article>
-    `).join("");
-
-    $$(".join-circle-button").forEach(button => {
-      button.addEventListener("click", () => {
-        openCircleDetails(button.dataset.circleId);
-      });
-    });
-  } catch {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">!</div>
-        <strong>Unable to load circles</strong>
-        <span>Please refresh and try again.</span>
-      </div>
-    `;
-  }
-}
-
-async function openCircleDetails(circleId) {
+async function openCircleDetails(
+  circleId
+) {
   if (!circleId) return;
 
-  const modal = $("#circleDetailsModal");
-  const content = $("#circleDetailsContent");
+  const modal =
+    $("#circleDetailsModal");
+
+  const content =
+    $("#circleDetailsContent");
 
   if (!modal || !content) return;
 
+  show(modal);
+
   content.innerHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">◌</div>
-      <strong>Loading circle</strong>
-      <span>Please wait...</span>
+    <div class="loading-state">
+      Loading circle...
     </div>
   `;
 
-  modal.style.display = "flex";
-  modal.classList.add("open");
-
   try {
-    const data = await api(`/circles/${encodeURIComponent(circleId)}`);
+    const data =
+      await api(
+        `/circles/${encodeURIComponent(
+          circleId
+        )}`
+      );
 
-    const circle = data.circle || data;
+    const circle =
+      data.circle || data;
 
     currentCircle = circle;
 
     let dates = [];
 
     try {
-      const dateData = await api(
-        `/circles/${encodeURIComponent(circleId)}/dates`
-      );
+      const dateData =
+        await api(
+          `/circles/${encodeURIComponent(
+            circleId
+          )}/dates`
+        );
 
-      dates = Array.isArray(dateData)
+      dates = Array.isArray(
+        dateData
+      )
         ? dateData
         : dateData.dates || [];
     } catch {
@@ -886,1044 +1018,711 @@ async function openCircleDetails(circleId) {
     }
 
     content.innerHTML = `
-      <div class="modal-header">
-        <div class="modal-logo">◎</div>
-        <div>
-          <div class="eyebrow">${escapeHTML(getTypeLabel(circle.type))}</div>
-          <h2>${escapeHTML(circle.name || "Savings Circle")}</h2>
-        </div>
-      </div>
+      <div class="circle-detail">
+        <span class="eyebrow">
+          ${escapeHTML(
+            circle.type ||
+              "CUSTOM"
+          )}
+        </span>
 
-      <div class="circle-detail-summary">
-        <div>
-          <span>Contribution</span>
-          <strong>${money(circle.amountCents)}</strong>
-        </div>
+        <h2>
+          ${escapeHTML(
+            circle.name ||
+              circle.code ||
+              "PayaCircle"
+          )}
+        </h2>
 
-        <div>
-          <span>Members</span>
-          <strong>${escapeHTML(String(circle.capacity || 0))}</strong>
-        </div>
-      </div>
+        <p>
+          Contribution:
+          <strong>
+            ${money(
+              circle.amountCents
+            )}
+          </strong>
+        </p>
 
-      <div class="circle-detail-section">
-        <div class="eyebrow">PAYOUT DATE</div>
-        <h3>Choose your payout date</h3>
+        <p>
+          Members:
+          <strong>
+            ${
+              circle._count
+                ?.memberships ||
+              0
+            } / ${
+              circle.capacity
+            }
+          </strong>
+        </p>
 
-        <div class="payout-date-options">
+        <p>
+          Status:
+          <strong>
+            ${escapeHTML(
+              prettyStatus(
+                circle.status
+              )
+            )}
+          </strong>
+        </p>
+
+        ${
+          dates.length
+            ? `
+              <div class="circle-date-list">
+                <h3>
+                  Available payout dates
+                </h3>
+
+                ${dates
+                  .map(
+                    (date) => `
+                      <label class="payout-date-option">
+                        <input
+                          type="radio"
+                          name="payoutDate"
+                          value="${escapeHTML(
+                            date.id
+                          )}"
+                        />
+                        <span>
+                          ${escapeHTML(
+                            formatDate(
+                              date.payoutAt
+                            )
+                          )}
+                        </span>
+                        <small>
+                          ${date.reserved || 0}
+                          /
+                          ${date.capacity || 1}
+                          reserved
+                        </small>
+                      </label>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : `
+              <div class="empty-state">
+                <strong>
+                  No payout dates available yet
+                </strong>
+                <span>
+                  Please check again later.
+                </span>
+              </div>
+            `
+        }
+
+        <div class="circle-detail-actions">
           ${
-            dates.length
-              ? dates.map(date => `
+            currentUser
+              ? `
                 <button
                   type="button"
-                  class="payout-date-option"
-                  data-payout-date-id="${escapeHTML(date.id)}"
-                  data-payout-date="${escapeHTML(date.payoutAt)}"
+                  class="primary"
+                  id="joinCircleButton"
+                  data-circle-id="${escapeHTML(
+                    circle.id
+                  )}"
                 >
-                  <strong>${escapeHTML(formatDate(date.payoutAt))}</strong>
-                  <span>
-                    ${escapeHTML(String(date.reserved || 0))}
-                    /
-                    ${escapeHTML(String(date.capacity || 1))}
-                    reserved
-                  </span>
+                  Join This Circle
                 </button>
-              `).join("")
+              `
               : `
-                <div class="empty-state compact">
-                  <strong>No payout dates available</strong>
-                  <span>Please check again later.</span>
-                </div>
+                <button
+                  type="button"
+                  class="primary"
+                  id="circleSignInButton"
+                >
+                  Sign In to Join
+                </button>
               `
           }
         </div>
       </div>
-
-      <div class="circle-detail-actions">
-        <button
-          class="primary full-width"
-          id="continueCircleButton"
-          ${dates.length ? "" : "disabled"}
-        >
-          Continue
-        </button>
-      </div>
     `;
 
-    currentPayoutDate = null;
+    const joinButton =
+      $("#joinCircleButton");
 
-    $$(".payout-date-option", content).forEach(button => {
-      button.addEventListener("click", () => {
-        $$(".payout-date-option", content).forEach(item => {
-          item.classList.remove("selected");
-        });
+    if (joinButton) {
+      joinButton.addEventListener(
+        "click",
+        reserveMembership
+      );
+    }
 
-        button.classList.add("selected");
+    const signInButton =
+      $("#circleSignInButton");
 
-        currentPayoutDate = {
-          id: button.dataset.payoutDateId,
-          payoutAt: button.dataset.payoutDate
-        };
-      });
-    });
-
-    const continueButton = $("#continueCircleButton", content);
-
-    if (continueButton) {
-      continueButton.addEventListener("click", async () => {
-        if (!currentPayoutDate) {
-          showToast("Please choose a payout date.", "info");
-          return;
+    if (signInButton) {
+      signInButton.addEventListener(
+        "click",
+        () => {
+          closeCircleDetails();
+          openAuthModal("login");
         }
-
-        if (!currentUser) {
-          closeCircleDetailsModal();
-          openLogin();
-          return;
-        }
-
-        await reserveMembership(
-          circle.id,
-          currentPayoutDate.id
-        );
-      });
+      );
     }
   } catch (error) {
     content.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">!</div>
-        <strong>Unable to open circle</strong>
-        <span>${escapeHTML(error.message)}</span>
-      </div>
-    `;
-  }
-}
-
-function closeCircleDetailsModal() {
-  const modal = $("#circleDetailsModal");
-
-  if (!modal) return;
-
-  modal.style.display = "none";
-  modal.classList.remove("open");
-}
-
-async function reserveMembership(circleId, payoutDateId) {
-  try {
-    const data = await api("/memberships", {
-      method: "POST",
-      body: JSON.stringify({
-        circleId,
-        payoutDateId
-      })
-    });
-
-    currentMembership = data.membership || data;
-
-    closeCircleDetailsModal();
-
-    await showPaymentPanel(currentMembership);
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
-
-/* =========================================================
-   MEMBERSHIPS
-   ========================================================= */
-
-async function loadMemberships() {
-  try {
-    const data = await api("/memberships");
-
-    const memberships = Array.isArray(data)
-      ? data
-      : data.memberships || [];
-
-    currentMembership = memberships[0] || null;
-
-    renderMemberships(memberships);
-
-    return memberships;
-  } catch {
-    renderMemberships([]);
-    return [];
-  }
-}
-
-function renderMemberships(memberships) {
-  const container = $("#dashboardCircles");
-
-  if (!container) return;
-
-  if (!memberships.length) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">◎</div>
-        <strong>No active circles yet</strong>
-        <span>Choose a savings circle to get started.</span>
-        <button
-          class="primary"
-          data-account-panel="circles"
-        >
-          Browse Circles
-        </button>
-      </div>
-    `;
-
-    const browseButton = container.querySelector(
-      "[data-account-panel='circles']"
-    );
-
-    if (browseButton) {
-      browseButton.addEventListener("click", () => {
-        activateAccountPanel("circles");
-      });
-    }
-
-    return;
-  }
-
-  container.innerHTML = memberships.map(membership => {
-    const circle = membership.circle || {};
-    const payoutDate = membership.payoutDate || {};
-
-    return `
-      <article class="account-circle-card">
-        <div class="account-circle-card-top">
-          <span class="circle-type">
-            ${escapeHTML(getTypeLabel(circle.type))}
-          </span>
-
-          <span class="status-badge ${getStatusClass(membership.status)}">
-            ${escapeHTML(getStatusLabel(membership.status))}
-          </span>
-        </div>
-
-        <h3>${escapeHTML(circle.name || "Savings Circle")}</h3>
-
-        <div class="account-circle-meta">
-          <div>
-            <span>Contribution</span>
-            <strong>${money(circle.amountCents)}</strong>
-          </div>
-
-          <div>
-            <span>Payout</span>
-            <strong>${escapeHTML(formatDate(payoutDate.payoutAt))}</strong>
-          </div>
-        </div>
-      </article>
-    `;
-  }).join("");
-}
-
-
-/* =========================================================
-   TRANSACTIONS
-   ========================================================= */
-
-async function loadTransactions() {
-  try {
-    const data = await api("/payments");
-
-    const payments = Array.isArray(data)
-      ? data
-      : data.payments || data.transactions || [];
-
-    renderTransactions(payments);
-
-    return payments;
-  } catch {
-    renderTransactions([]);
-    return [];
-  }
-}
-
-function renderTransactions(payments) {
-  const containers = [
-    "#contributionTransactions",
-    "#contributionsPageList"
-  ];
-
-  containers.forEach(selector => {
-    const container = $(selector);
-
-    if (!container) return;
-
-    if (!payments.length) {
-      container.innerHTML = `
-        <div class="empty-state compact">
-          <div class="empty-icon">↙</div>
-          <strong>No transactions yet</strong>
-          <span>Your confirmed contributions will appear here.</span>
-        </div>
-      `;
-
-      return;
-    }
-
-    container.innerHTML = payments.map(payment => `
-      <div class="transaction-row">
-        <div>
-          <strong>${escapeHTML(payment.circle?.name || "PayaCircle")}</strong>
-          <span>${escapeHTML(formatDateTime(payment.createdAt))}</span>
-        </div>
-
-        <div>
-          <strong>${money(payment.amountCents)}</strong>
-          <span class="status-badge ${getStatusClass(payment.status)}">
-            ${escapeHTML(getStatusLabel(payment.status))}
-          </span>
-        </div>
-      </div>
-    `).join("");
-  });
-
-  const total = payments.reduce(
-    (sum, payment) => sum + (Number(payment.amountCents) || 0),
-    0
-  );
-
-  const paid = payments.filter(
-    payment => payment.status === "CAPTURED"
-  ).length;
-
-  const pending = payments.filter(
-    payment =>
-      payment.status === "CREATED" ||
-      payment.status === "APPROVED"
-  ).length;
-
-  const totalElement = $("#contributionTotal");
-  const paidElement = $("#contributionPaidCount");
-  const pendingElement = $("#contributionPendingCount");
-
-  if (totalElement) totalElement.textContent = money(total);
-  if (paidElement) paidElement.textContent = String(paid);
-  if (pendingElement) pendingElement.textContent = String(pending);
-}
-
-
-/* =========================================================
-   PAYOUTS
-   ========================================================= */
-
-async function loadPayouts() {
-  try {
-    const data = await api("/payouts");
-
-    const payouts = Array.isArray(data)
-      ? data
-      : data.payouts || [];
-
-    renderPayouts(payouts);
-
-    return payouts;
-  } catch {
-    renderPayouts([]);
-    return [];
-  }
-}
-
-function renderPayouts(payouts) {
-  const container = $("#payoutTimeline");
-
-  if (!container) return;
-
-  if (!payouts.length) {
-    container.innerHTML = `
-      <div class="empty-state compact">
-        <div class="empty-icon">↗</div>
-        <strong>No payouts yet</strong>
+        <strong>
+          Unable to open circle
+        </strong>
         <span>
-          Your payout schedule will appear here after joining a circle.
+          ${escapeHTML(
+            error.message
+          )}
         </span>
       </div>
     `;
+  }
+}
 
+/* --------------------------------
+   CLOSE CIRCLE MODAL
+--------------------------------- */
+
+function closeCircleDetails() {
+  const modal =
+    $("#circleDetailsModal");
+
+  if (modal) {
+    hide(modal);
+  }
+}
+
+/* --------------------------------
+   RESERVE MEMBERSHIP
+--------------------------------- */
+
+async function reserveMembership() {
+  if (!currentUser) {
+    closeCircleDetails();
+    openAuthModal("login");
     return;
   }
 
-  container.innerHTML = payouts.map(payout => `
-    <div class="payout-timeline-item">
-      <div class="payout-timeline-icon">↗</div>
+  if (!currentCircle) return;
 
-      <div class="payout-timeline-content">
-        <strong>${money(payout.amountCents)}</strong>
-        <span>${escapeHTML(formatDate(payout.payoutDate?.payoutAt))}</span>
-      </div>
+  const selected =
+    document.querySelector(
+      'input[name="payoutDate"]:checked'
+    );
 
-      <span class="status-badge ${getStatusClass(payout.status)}">
-        ${escapeHTML(getStatusLabel(payout.status))}
-      </span>
-    </div>
-  `).join("");
-
-  const next = payouts
-    .filter(payout => payout.status === "SCHEDULED")
-    .sort((a, b) => {
-      return new Date(a.payoutDate?.payoutAt || 0) -
-        new Date(b.payoutDate?.payoutAt || 0);
-    })[0];
-
-  const nextAmount = $("#payoutPageNextAmount");
-  const nextDate = $("#payoutPageNextDate");
-
-  if (next) {
-    if (nextAmount) {
-      nextAmount.textContent = money(next.amountCents);
-    }
-
-    if (nextDate) {
-      nextDate.textContent = formatDate(
-        next.payoutDate?.payoutAt
-      );
-    }
-  }
-}
-
-
-/* =========================================================
-   OVERVIEW
-   ========================================================= */
-
-function renderOverview() {
-  const memberships = currentMembership
-    ? [currentMembership]
-    : [];
-
-  const totalSavings = memberships.reduce((sum, membership) => {
-    return sum +
-      (Number(membership.circle?.amountCents) || 0);
-  }, 0);
-
-  const savingsElement = $("#accountTotalSavings");
-  const balanceElement = $("#accountAvailableBalance");
-  const countElement = $("#dashboardCircleCount");
-
-  if (savingsElement) {
-    savingsElement.textContent = money(totalSavings);
-  }
-
-  if (balanceElement) {
-    balanceElement.textContent = money(totalSavings);
-  }
-
-  if (countElement) {
-    countElement.textContent = String(memberships.length);
-  }
-
-  const nextPayout =
-    memberships
-      .map(membership => membership.payoutDate?.payoutAt)
-      .filter(Boolean)
-      .sort((a, b) => new Date(a) - new Date(b))[0];
-
-  const nextPayoutElement = $("#dashboardNextPayout");
-  const overviewPayoutDate = $("#overviewPayoutDate");
-  const overviewPayoutDetails = $("#overviewPayoutDetails");
-
-  if (nextPayout) {
-    const formatted = formatDate(nextPayout);
-
-    if (nextPayoutElement) {
-      nextPayoutElement.textContent = formatted;
-    }
-
-    if (overviewPayoutDate) {
-      overviewPayoutDate.textContent = formatted;
-    }
-
-    if (overviewPayoutDetails) {
-      overviewPayoutDetails.textContent =
-        "Your next scheduled PayaCircle payout.";
-    }
-  }
-}
-
-
-/* =========================================================
-   PAYMENT PANEL
-   ========================================================= */
-
-async function showPaymentPanel(membership) {
-  const panel = $("#paymentPanel");
-  const details = $("#paymentDetails");
-
-  if (!panel || !membership) return;
-
-  const circle = membership.circle || currentCircle || {};
-
-  if (details) {
-    details.innerHTML = `
-      <div class="payment-detail-row">
-        <span>Circle</span>
-        <strong>${escapeHTML(circle.name || "Savings Circle")}</strong>
-      </div>
-
-      <div class="payment-detail-row">
-        <span>Contribution</span>
-        <strong>${money(circle.amountCents)}</strong>
-      </div>
-
-      <div class="payment-detail-row">
-        <span>Payout date</span>
-        <strong>${escapeHTML(
-          formatDate(membership.payoutDate?.payoutAt)
-        )}</strong>
-      </div>
-    `;
-  }
-
-  $$(".account-panel").forEach(item => {
-    item.style.display = "none";
-    item.classList.remove("active");
-  });
-
-  panel.style.display = "block";
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-}
-
-
-/* =========================================================
-   PAYPAL
-   ========================================================= */
-
-async function startPayPalPayment() {
-  if (!currentMembership) {
-    showToast("Please choose a savings circle first.", "error");
+  if (!selected) {
+    alert(
+      "Please select a payout date."
+    );
     return;
   }
 
-  const button = $("#paypalButton");
+  const button =
+    $("#joinCircleButton");
 
-  setLoading(button, true, "Connecting to PayPal...");
+  if (button) {
+    button.disabled = true;
+    button.textContent =
+      "Joining...";
+  }
 
   try {
-    const data = await api("/paypal/create-order", {
-      method: "POST",
-      body: JSON.stringify({
-        membershipId: currentMembership.id
-      })
-    });
+    await api(
+      "/memberships",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          circleId:
+            currentCircle.id,
+          payoutDateId:
+            selected.value
+        })
+      }
+    );
 
-    if (data.approvalUrl) {
-      window.location.href = data.approvalUrl;
+    alert(
+      "Your circle membership has been reserved."
+    );
+
+    closeCircleDetails();
+
+    await loadAccount();
+  } catch (error) {
+    alert(
+      error.message ||
+        "Unable to join this circle."
+    );
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "Join This Circle";
+    }
+  }
+}
+
+/* --------------------------------
+   PAYMENTS
+--------------------------------- */
+
+async function loadPayments() {
+  const container =
+    $("#paymentsList");
+
+  if (!container) return;
+
+  try {
+    const payments =
+      await api("/payments");
+
+    if (!payments.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <strong>No payments yet</strong>
+          <span>Your PayaCircle payments will appear here.</span>
+        </div>
+      `;
       return;
     }
 
-    if (data.links) {
-      const approvalLink = data.links.find(
-        link =>
-          link.rel === "approve" ||
-          link.rel === "payer-action"
-      );
+    container.innerHTML =
+      payments
+        .map(
+          (payment) => `
+            <article class="transaction-row">
+              <div>
+                <strong>
+                  ${escapeHTML(
+                    payment.circle
+                      ?.name ||
+                      payment.circle
+                        ?.code ||
+                      "PayaCircle"
+                  )}
+                </strong>
+                <span>
+                  ${formatDateTime(
+                    payment.createdAt
+                  )}
+                </span>
+              </div>
 
-      if (approvalLink?.href) {
-        window.location.href = approvalLink.href;
-        return;
+              <strong>
+                ${money(
+                  payment.amountCents
+                )}
+              </strong>
+
+              <span class="status-badge">
+                ${escapeHTML(
+                  prettyStatus(
+                    payment.status
+                  )
+                )}
+              </span>
+            </article>
+          `
+        )
+        .join("");
+  } catch (error) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <strong>
+          Unable to load payments
+        </strong>
+        <span>
+          ${escapeHTML(
+            error.message
+          )}
+        </span>
+      </div>
+    `;
+  }
+}
+
+/* --------------------------------
+   PAYOUTS
+--------------------------------- */
+
+async function loadPayouts() {
+  const container =
+    $("#payoutsList");
+
+  if (!container) return;
+
+  try {
+    const payouts =
+      await api("/payouts");
+
+    if (!payouts.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <strong>No payouts yet</strong>
+          <span>Your scheduled and completed payouts will appear here.</span>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML =
+      payouts
+        .map(
+          (payout) => `
+            <article class="transaction-row">
+              <div>
+                <strong>
+                  ${escapeHTML(
+                    payout.circle
+                      ?.name ||
+                      payout.circle
+                        ?.code ||
+                      "PayaCircle"
+                  )}
+                </strong>
+                <span>
+                  ${
+                    payout.payoutDate
+                      ? formatDate(
+                          payout.payoutDate
+                            .payoutAt
+                        )
+                      : "Date pending"
+                  }
+                </span>
+              </div>
+
+              <strong>
+                ${money(
+                  payout.amountCents
+                )}
+              </strong>
+
+              <span class="status-badge">
+                ${escapeHTML(
+                  prettyStatus(
+                    payout.status
+                  )
+                )}
+              </span>
+            </article>
+          `
+        )
+        .join("");
+  } catch (error) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <strong>
+          Unable to load payouts
+        </strong>
+        <span>
+          ${escapeHTML(
+            error.message
+          )}
+        </span>
+      </div>
+    `;
+  }
+}
+
+/* --------------------------------
+   ACCOUNT NAVIGATION
+--------------------------------- */
+
+function activateAccountPanel(
+  panelName
+) {
+  $$("[data-account-panel]")
+    .forEach((panel) => {
+      const target =
+        panel.dataset.accountPanel;
+
+      if (target === panelName) {
+        show(panel);
+      } else {
+        hide(panel);
       }
-    }
-
-    throw new Error("PayPal approval link was not returned.");
-  } catch (error) {
-    showToast(error.message, "error");
-  } finally {
-    setLoading(button, false);
-  }
-}
-
-async function handlePayPalReturn() {
-  if (paypalReturnHandled) return;
-
-  const params = new URLSearchParams(window.location.search);
-
-  const token =
-    params.get("token") ||
-    params.get("orderID");
-
-  const payerId =
-    params.get("PayerID") ||
-    params.get("payerId");
-
-  if (!token && !payerId) return;
-
-  paypalReturnHandled = true;
-
-  try {
-    await api("/paypal/capture-order", {
-      method: "POST",
-      body: JSON.stringify({
-        orderId: token,
-        payerId
-      })
     });
 
-    window.history.replaceState(
-      {},
-      document.title,
-      window.location.pathname
-    );
-
-    const panel = $("#paymentPanel");
-    const success = $("#paymentSuccess");
-
-    if (panel) panel.style.display = "none";
-
-    if (success) {
-      success.style.display = "block";
-    }
-
-    await refreshDashboard();
-
-    showToast("Payment confirmed successfully.", "success");
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
-
-/* =========================================================
-   CREATE CIRCLE
-   ========================================================= */
-
-function openCircleModal() {
-  const modal = $("#circleModal");
-
-  if (!modal) return;
-
-  modal.style.display = "flex";
-  modal.classList.add("open");
-}
-
-function closeCircleModal() {
-  const modal = $("#circleModal");
-
-  if (!modal) return;
-
-  modal.style.display = "none";
-  modal.classList.remove("open");
-}
-
-async function createCircle(event) {
-  event.preventDefault();
-
-  const form = event.currentTarget;
-  const button = form.querySelector('button[type="submit"]');
-  const message = $("#circleMessage");
-
-  const name = $("#circleName")?.value.trim();
-  const type = $("#circleType")?.value;
-  const amount = Number($("#circleAmount")?.value);
-  const capacity = Number($("#circleCapacity")?.value);
-
-  if (!name || !type || !amount || !capacity) {
-    if (message) {
-      message.textContent = "Please complete all fields.";
-      message.className = "form-message error";
-    }
-
-    return;
-  }
-
-  setLoading(button, true, "Creating circle...");
-
-  try {
-    const data = await api("/circles", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        type,
-        amount,
-        capacity
-      })
+  $$("[data-account-nav]")
+    .forEach((button) => {
+      button.classList.toggle(
+        "active",
+        button.dataset.accountNav ===
+          panelName
+      );
     });
-
-    if (message) {
-      message.textContent =
-        data.message || "Circle created successfully.";
-      message.className = "form-message success";
-    }
-
-    form.reset();
-
-    setTimeout(() => {
-      closeCircleModal();
-      loadCirclesPage();
-      loadPublicCircles();
-    }, 700);
-  } catch (error) {
-    if (message) {
-      message.textContent = error.message;
-      message.className = "form-message error";
-    }
-  } finally {
-    setLoading(button, false);
-  }
 }
 
-
-/* =========================================================
-   CIRCLE FILTERS
-   ========================================================= */
-
-function bindCircleFilters() {
-  $$(".circle-filter").forEach(button => {
-    button.addEventListener("click", async () => {
-      $$(".circle-filter").forEach(item => {
-        item.classList.remove("active");
-      });
-
-      button.classList.add("active");
-
-      const filter = button.dataset.circleFilter;
-
-      await loadCirclesPage();
-
-      if (filter === "all") return;
-
-      const cards = $$("#circlesPageGrid .circle-card");
-
-      cards.forEach(card => {
-        const status =
-          card.querySelector(".status-badge")?.textContent
-            ?.toLowerCase() || "";
-
-        if (filter === "active") {
-          card.style.display =
-            status.includes("paid") ||
-            status.includes("active")
-              ? ""
-              : "none";
+function bindAccountNavigation() {
+  $$("[data-account-nav]")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          activateAccountPanel(
+            button.dataset.accountNav
+          );
         }
-
-        if (filter === "pending") {
-          card.style.display =
-            status.includes("pending")
-              ? ""
-              : "none";
-        }
-      });
+      );
     });
-  });
 }
 
-
-/* =========================================================
+/* --------------------------------
    PROFILE MENU
-   ========================================================= */
+--------------------------------- */
 
 function bindProfileMenu() {
-  const trigger = $("#accountProfileTrigger");
-  const menu = $("#accountProfileMenu");
-  const mobileButton = $("#mobileProfileButton");
+  const button =
+    $("#profileMenuButton");
 
-  function toggleMenu() {
-    if (!menu) return;
+  const menu =
+    $("#profileMenu");
 
-    menu.style.display =
-      menu.style.display === "block"
-        ? "none"
-        : "block";
-  }
+  if (!button || !menu) return;
 
-  if (trigger) {
-    trigger.addEventListener("click", event => {
-      event.preventDefault();
-      toggleMenu();
-    });
-  }
+  button.addEventListener(
+    "click",
+    (event) => {
+      event.stopPropagation();
 
-  if (mobileButton) {
-    mobileButton.addEventListener("click", event => {
-      event.preventDefault();
-      toggleMenu();
-    });
-  }
-
-  document.addEventListener("click", event => {
-    if (!menu) return;
-
-    if (
-      menu.style.display === "block" &&
-      !menu.contains(event.target) &&
-      event.target !== trigger &&
-      event.target !== mobileButton
-    ) {
-      menu.style.display = "none";
+      menu.hidden =
+        !menu.hidden;
     }
-  });
+  );
+
+  document.addEventListener(
+    "click",
+    () => {
+      menu.hidden = true;
+    }
+  );
 }
 
-
-/* =========================================================
+/* --------------------------------
    LOGOUT BUTTONS
-   ========================================================= */
+--------------------------------- */
 
 function bindLogoutButtons() {
-  [
-    "#dashboardLogout",
-    "#profileMenuLogout"
-  ].forEach(selector => {
-    const button = $(selector);
-
-    if (!button) return;
-
-    button.addEventListener("click", event => {
-      event.preventDefault();
-      logout();
-    });
-  });
-}
-
-
-/* =========================================================
-   CREATE CIRCLE BUTTONS
-   ========================================================= */
-
-function bindCreateCircleButtons() {
-  [
-    "#dashboardCreateCircle",
-    "#circlesCreateButton"
-  ].forEach(selector => {
-    const button = $(selector);
-
-    if (!button) return;
-
-    button.addEventListener("click", event => {
-      event.preventDefault();
-
-      if (!currentUser) {
-        openLogin();
-        return;
-      }
-
-      openCircleModal();
-    });
-  });
-}
-
-
-/* =========================================================
-   MODAL CLOSE BUTTONS
-   ========================================================= */
-
-function bindModalButtons() {
-  const closeCircle = $("#closeCircleModal");
-
-  if (closeCircle) {
-    closeCircle.addEventListener("click", event => {
-      event.preventDefault();
-      closeCircleModal();
-    });
-  }
-
-  const closeDetails = $("#closeCircleDetailsModal");
-
-  if (closeDetails) {
-    closeDetails.addEventListener("click", event => {
-      event.preventDefault();
-      closeCircleDetailsModal();
-    });
-  }
-
-  const circleModal = $("#circleModal");
-
-  if (circleModal) {
-    circleModal.addEventListener("click", event => {
-      if (event.target === circleModal) {
-        closeCircleModal();
-      }
-    });
-  }
-
-  const detailsModal = $("#circleDetailsModal");
-
-  if (detailsModal) {
-    detailsModal.addEventListener("click", event => {
-      if (event.target === detailsModal) {
-        closeCircleDetailsModal();
-      }
-    });
-  }
-}
-
-
-/* =========================================================
-   PAYMENT BUTTONS
-   ========================================================= */
-
-function bindPaymentButtons() {
-  const paypalButton = $("#paypalButton");
-
-  if (paypalButton) {
-    paypalButton.addEventListener("click", event => {
-      event.preventDefault();
-      startPayPalPayment();
-    });
-  }
-
-  const cancelPayment = $("#cancelPayment");
-
-  if (cancelPayment) {
-    cancelPayment.addEventListener("click", event => {
-      event.preventDefault();
-
-      const panel = $("#paymentPanel");
-
-      if (panel) {
-        panel.style.display = "none";
-      }
-
-      activateAccountPanel("circles");
-    });
-  }
-}
-
-
-/* =========================================================
-   PUBLIC NAVIGATION
-   ========================================================= */
-
-function bindPublicNavigation() {
-  $$(".public-nav a, .footer-links a").forEach(link => {
-    link.addEventListener("click", event => {
-      const href = link.getAttribute("href");
-
-      if (!href || !href.startsWith("#")) return;
-
-      const target = $(href);
-
-      if (!target) return;
-
-      event.preventDefault();
-
-      target.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
-    });
-  });
-
-  const publicBrand = $("#publicBrand");
-
-  if (publicBrand) {
-    publicBrand.addEventListener("click", event => {
-      const href = publicBrand.getAttribute("href");
-
-      if (href === "/") {
-        event.preventDefault();
-
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth"
-        });
-      }
-    });
-  }
-
-  const accountBrand = $("#accountBrand");
-
-  if (accountBrand) {
-    accountBrand.addEventListener("click", event => {
-      event.preventDefault();
-      activateAccountPanel("overview");
-    });
-  }
-}
-
-
-/* =========================================================
-   NOTIFICATIONS
-   ========================================================= */
-
-function bindNotifications() {
-  [
-    "#accountNotifications",
-    "#mobileNotifications"
-  ].forEach(selector => {
-    const button = $(selector);
-
-    if (!button) return;
-
-    button.addEventListener("click", event => {
-      event.preventDefault();
-
-      showToast(
-        "No new notifications.",
-        "info"
+  $$("[data-logout]")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        logout
       );
     });
-  });
-}
 
+  const logoutButton =
+    $("#logoutButton");
 
-/* =========================================================
-   INITIALIZE
-   ========================================================= */
-
-async function initializeApp() {
-  try {
-    bindAuthButtons();
-    bindAccountNavigation();
-    bindCircleFilters();
-    bindProfileMenu();
-    bindLogoutButtons();
-    bindCreateCircleButtons();
-    bindModalButtons();
-    bindPaymentButtons();
-    bindPublicNavigation();
-    bindNotifications();
-
-    const registerForm = $("#registerForm");
-
-    if (registerForm) {
-      registerForm.addEventListener("submit", register);
-    }
-
-    const loginForm = $("#loginForm");
-
-    if (loginForm) {
-      loginForm.addEventListener("submit", login);
-    }
-
-    const circleForm = $("#circleForm");
-
-    if (circleForm) {
-      circleForm.addEventListener("submit", createCircle);
-    }
-
-    await loadCurrentUser();
-
-    if (currentUser) {
-      showDashboard();
-    } else {
-      hideDashboard();
-      await loadPublicCircles();
-    }
-
-    await handlePayPalReturn();
-  } catch (error) {
-    console.error("PayaCircle initialization error:", error);
-
-    showToast(
-      "PayaCircle loaded, but some features could not initialize.",
-      "error"
+  if (logoutButton) {
+    logoutButton.addEventListener(
+      "click",
+      logout
     );
   }
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener(
-    "DOMContentLoaded",
-    initializeApp
-  );
-} else {
-  initializeApp();
+/* --------------------------------
+   MODAL CLOSE BUTTONS
+--------------------------------- */
+
+function bindModalButtons() {
+  const closeCircle =
+    $("#closeCircleDetailsModal");
+
+  if (closeCircle) {
+    closeCircle.addEventListener(
+      "click",
+      closeCircleDetails
+    );
+  }
+
+  const authModal =
+    $("#authModal");
+
+  if (authModal) {
+    authModal.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          authModal
+        ) {
+          closeAuthModal();
+        }
+      }
+    );
+  }
+
+  const circleModal =
+    $("#circleDetailsModal");
+
+  if (circleModal) {
+    circleModal.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          circleModal
+        ) {
+          closeCircleDetails();
+        }
+      }
+    );
+  }
 }
+
+/* --------------------------------
+   FORMS
+--------------------------------- */
+
+function bindForms() {
+  const loginForm =
+    $("#loginForm");
+
+  if (loginForm) {
+    loginForm.addEventListener(
+      "submit",
+      loginUser
+    );
+  }
+
+  const registerForm =
+    $("#registerForm");
+
+  if (registerForm) {
+    registerForm.addEventListener(
+      "submit",
+      registerUser
+    );
+  }
+}
+
+/* --------------------------------
+   PUBLIC NAVIGATION
+--------------------------------- */
+
+function bindPublicNavigation() {
+  $$("[data-scroll-to]")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          const target =
+            document.querySelector(
+              button.dataset.scrollTo
+            );
+
+          if (target) {
+            target.scrollIntoView({
+              behavior: "smooth"
+            });
+          }
+        }
+      );
+    });
+}
+
+/* --------------------------------
+   PAYPAL
+--------------------------------- */
+
+async function createPayPalOrder(
+  circleId,
+  membershipId
+) {
+  return api(
+    "/paypal/create-order",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        circleId,
+        membershipId
+      })
+    }
+  );
+}
+
+async function capturePayPalOrder(
+  orderId
+) {
+  return api(
+    "/paypal/capture-order",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        orderId
+      })
+    }
+  );
+}
+
+/* --------------------------------
+   INITIALIZATION
+--------------------------------- */
+
+async function initialize() {
+  bindAuthButtons();
+  bindAccountNavigation();
+  bindProfileMenu();
+  bindLogoutButtons();
+  bindModalButtons();
+  bindForms();
+  bindPublicNavigation();
+
+  await loadPublicCircles();
+
+  const user =
+    await getCurrentUser();
+
+  if (user) {
+    currentUser = user;
+
+    showAccountDashboard();
+
+    renderUserInformation(
+      user
+    );
+
+    renderMemberships(
+      user
+    );
+
+    renderAccountBalance(
+      user
+    );
+
+    await loadPayments();
+    await loadPayouts();
+
+    activateAccountPanel(
+      "overview"
+    );
+  } else {
+    showPublicSite();
+  }
+}
+
+/* --------------------------------
+   START
+--------------------------------- */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+    initialize().catch(
+      (error) => {
+        console.error(
+          "PayaCircle initialization error:",
+          error
+        );
+      }
+    );
+  }
+);
