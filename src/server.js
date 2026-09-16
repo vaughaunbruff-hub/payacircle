@@ -127,19 +127,150 @@ app.post("/api/memberships",auth,async(req,res)=>{
 });
 
 app.post("/api/paypal/create-order",auth,async(req,res)=>{
-  const parsed=z.object({membershipId:z.string()}).safeParse(req.body);
-  if(!parsed.success)return res.status(400).json({error:"Invalid membership"});
-  const m=await prisma.membership.findUnique({where:{id:parsed.data.membershipId},include:{circle:true}});
-  if(!m||m.userId!==req.user.sub||m.status!=="PAYMENT_PENDING")return res.status(404).json({error:"Membership not payable"});
-  const access=await paypalToken();
-  const order=await fetch(`${paypalBase()}/v2/checkout/orders`,{
-    method:"POST",headers:{Authorization:`Bearer ${access}`,"Content-Type":"application/json","PayPal-Request-Id":`circle-${m.id}`},
-    body:JSON.stringify({intent:"CAPTURE",purchase_units:[{reference_id:m.id,custom_id:m.id,amount:{currency_code:"USD",value:(m.circle.amountCents/100).toFixed(2)},description:`PayaCircle savings contribution — ${m.circle.code}`}],application_context:{user_action:"PAY_NOW",shipping_preference:"NO_SHIPPING"}})
-  });
-  const data=await order.json();
-  if(!order.ok)return res.status(502).json({error:"PayPal order creation failed",details:data});
-  await prisma.payment.create({data:{userId:req.user.sub,circleId:m.circleId,membershipId:m.id,paypalOrderId:data.id,amountCents:m.circle.amountCents,status:"CREATED"}});
-  res.json({id:data.id});
+  try {
+    const parsed=z.object({
+      membershipId:z.string()
+    }).safeParse(req.body);
+
+    if(!parsed.success){
+      return res.status(400).json({
+        error:"Invalid membership"
+      });
+    }
+
+    const m=await prisma.membership.findUnique({
+      where:{
+        id:parsed.data.membershipId
+      },
+      include:{
+        circle:true,
+        payoutDate:true
+      }
+    });
+
+    if(
+      !m ||
+      m.userId!==req.user.sub ||
+      m.status!=="PAYMENT_PENDING"
+    ){
+      return res.status(404).json({
+        error:"Membership not payable"
+      });
+    }
+
+    const access=await paypalToken();
+
+    const order=await fetch(
+      `${paypalBase()}/v2/checkout/orders`,
+      {
+        method:"POST",
+
+        headers:{
+          Authorization:`Bearer ${access}`,
+          "Content-Type":"application/json",
+
+          "PayPal-Request-Id":
+            `circle-${m.id}-${Date.now()}`
+        },
+
+        body:JSON.stringify({
+
+          intent:"CAPTURE",
+
+          purchase_units:[
+            {
+              reference_id:m.id,
+
+              custom_id:m.id,
+
+              amount:{
+                currency_code:"USD",
+
+                value:
+                  (m.circle.amountCents/100)
+                    .toFixed(2)
+              },
+
+              description:
+                `PayaCircle savings contribution — ${m.circle.code}`
+            }
+          ],
+
+          application_context:{
+            brand_name:"PayaCircle",
+
+            user_action:"PAY_NOW",
+
+            shipping_preference:"NO_SHIPPING",
+
+            return_url:
+              `${process.env.APP_URL || "http://localhost:3000"}/?paypal=success`,
+
+            cancel_url:
+              `${process.env.APP_URL || "http://localhost:3000"}/?paypal=cancel`
+          }
+
+        })
+      }
+    );
+
+    const data=await order.json();
+
+    if(!order.ok){
+
+      console.error(
+        "PayPal order creation failed:",
+        data
+      );
+
+      return res.status(502).json({
+        error:"PayPal order creation failed",
+        details:data
+      });
+
+    }
+
+    const approvalLink=
+      Array.isArray(data.links)
+        ? data.links.find(
+            link => link.rel==="approve"
+          )
+        : null;
+
+    await prisma.payment.create({
+      data:{
+        userId:req.user.sub,
+
+        circleId:m.circleId,
+
+        membershipId:m.id,
+
+        paypalOrderId:data.id,
+
+        amountCents:m.circle.amountCents,
+
+        status:"CREATED"
+      }
+    });
+
+    res.json({
+      id:data.id,
+
+      approvalUrl:
+        approvalLink?.href || null
+    });
+
+  } catch(error) {
+
+    console.error(
+      "PayPal create-order error:",
+      error
+    );
+
+    res.status(500).json({
+      error:"Unable to create PayPal payment"
+    });
+  }
 });
 
 app.post("/api/paypal/capture-order",auth,async(req,res)=>{
