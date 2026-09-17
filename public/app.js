@@ -245,31 +245,41 @@ function bindAuthButtons() {
 async function registerUser(event) {
   event.preventDefault();
 
-  const form = event.currentTarget;
-
-  const name =
-    form.querySelector('[name="name"]')?.value?.trim() || "";
-
-  const email =
-    form.querySelector('[name="email"]')?.value?.trim() || "";
-
-  const password =
-    form.querySelector('[name="password"]')?.value || "";
+  const nameInput = $("#registerName");
+  const emailInput = $("#registerEmail");
+  const passwordInput = $("#registerPassword");
 
   const message = $("#registerMessage");
-  const button = form.querySelector('button[type="submit"]');
+  const submitButton =
+    event.currentTarget.querySelector('button[type="submit"]');
+
+  const name = nameInput?.value?.trim() || "";
+  const email = emailInput?.value?.trim() || "";
+  const password = passwordInput?.value || "";
 
   if (!name || !email || !password) {
     if (message) {
-      message.textContent = "Please complete all fields.";
+      message.textContent =
+        "Please enter your name, email, and password.";
     }
-
     return;
   }
 
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Creating account...";
+  if (password.length < 6) {
+    if (message) {
+      message.textContent =
+        "Password must be at least 6 characters.";
+    }
+    return;
+  }
+
+  if (message) {
+    message.textContent = "";
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Creating account...";
   }
 
   try {
@@ -282,27 +292,24 @@ async function registerUser(event) {
       })
     });
 
-    currentUser = data.user || data;
+    currentUser = data;
 
-    if (message) {
-      message.textContent =
-        data.message || "Account created successfully.";
-    }
+    closeAuthModal();
 
-    setTimeout(() => {
-      closeAuthModal();
-      loadAccount();
-    }, 500);
+    await loadAccount();
+
   } catch (error) {
     if (message) {
       message.textContent =
-        error.message || "Unable to create account.";
+        error.message || "Unable to create your account.";
     }
   } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Create Account";
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Create Account";
     }
+  }
+}
   }
 }
 
