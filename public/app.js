@@ -1208,6 +1208,17 @@ function openCircleForm(circle) {
   }
 }
 
+function openCircleModal() {
+  const modal = $("#circleModal");
+
+  if (!modal) {
+    console.error("Circle modal not found: #circleModal");
+    return;
+  }
+
+  show(modal);
+}
+
 function closeCircleModal() {
   hide($("#circleModal"));
 }
