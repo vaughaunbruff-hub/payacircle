@@ -313,29 +313,28 @@ async function registerUser(event) {
 async function loginUser(event) {
   event.preventDefault();
 
-  const form = event.currentTarget;
-
-  const email =
-    form.querySelector('[name="email"]')?.value?.trim() || "";
-
-  const password =
-    form.querySelector('[name="password"]')?.value || "";
-
+  const emailInput = $("#loginEmail");
+  const passwordInput = $("#loginPassword");
   const message = $("#loginMessage");
-  const button = form.querySelector('button[type="submit"]');
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+
+  const email = emailInput?.value?.trim() || "";
+  const password = passwordInput?.value || "";
 
   if (!email || !password) {
     if (message) {
-      message.textContent =
-        "Please enter your email and password.";
+      message.textContent = "Please enter your email and password.";
     }
-
     return;
   }
 
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Signing in...";
+  if (message) {
+    message.textContent = "";
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Signing in...";
   }
 
   try {
@@ -347,29 +346,27 @@ async function loginUser(event) {
       })
     });
 
-    currentUser = data.user || data;
+    currentUser = data;
 
     if (message) {
-      message.textContent =
-        data.message || "Signed in successfully.";
+      message.textContent = "";
     }
 
     closeAuthModal();
-
     await loadAccount();
+
   } catch (error) {
     if (message) {
       message.textContent =
         error.message || "Unable to sign in.";
     }
   } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Sign In";
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Sign In";
     }
   }
 }
-
 /* =========================
    CURRENT USER
 ========================= */
