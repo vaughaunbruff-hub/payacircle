@@ -50,14 +50,16 @@ function formatDateTime(value) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
+  const fetchOptions = {
     credentials: "include",
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
     }
-  });
+  };
+
+  const response = await fetch(`${API}${path}`, fetchOptions);
 
   let data = {};
 
@@ -93,93 +95,29 @@ function hide(element) {
   element.style.display = "none";
 }
 
+/* =========================================================
+   PUBLIC / ACCOUNT DISPLAY
+========================================================= */
+
 function showPublicSite() {
   const publicSite = $("#publicSite");
-  const accountSite = $("#accountSite");
+  const dashboard = $("#dashboard");
 
   show(publicSite);
-  hide(accountSite);
+  hide(dashboard);
 }
 
-function switchAuthMode(mode) {
-  const loginForm = $("#loginForm");
-  const registerForm = $("#registerForm");
-
-  const loginTab = $("#loginTab");
-  const registerTab = $("#registerTab");
-
-  const title = $("#authModalTitle");
-
-  const loginMessage = $("#loginMessage");
-  const registerMessage = $("#registerMessage");
-
-  const normalizedMode =
-    String(mode).toLowerCase() === "register"
-      ? "register"
-      : "login";
-
-  if (normalizedMode === "login") {
-    if (loginForm) {
-      loginForm.style.display = "";
-      loginForm.hidden = false;
-    }
-
-    if (registerForm) {
-      registerForm.style.display = "none";
-      registerForm.hidden = true;
-    }
-
-    if (loginTab) {
-      loginTab.classList.add("active");
-      loginTab.setAttribute("aria-selected", "true");
-    }
-
-    if (registerTab) {
-      registerTab.classList.remove("active");
-      registerTab.setAttribute("aria-selected", "false");
-    }
-
-    if (title) {
-      title.textContent = "Sign in to your account";
-    }
-
-    if (loginMessage) {
-      loginMessage.textContent = "";
-    }
-  } else {
-    if (registerForm) {
-      registerForm.style.display = "";
-      registerForm.hidden = false;
-    }
-
-   
+function showAccountDashboard() {
   const publicSite = $("#publicSite");
-  const accountSite = $("#accountSite");
+  const dashboard = $("#dashboard");
 
   hide(publicSite);
-  show(accountSite);
+  show(dashboard);
 }
 
-function openAuthModal(mode = "login") {
-  const modal = $("#authModal");
-
-  if (!modal) {
-    console.error("PayaCircle: authModal was not found.");
-    return;
-  }
-
-  show(modal);
-
-  switchAuthMode(mode);
-}
-
-function closeAuthModal() {
-  const modal = $("#authModal");
-
-  if (modal) {
-    hide(modal);
-  }
-}
+/* =========================================================
+   AUTH MODAL
+========================================================= */
 
 function switchAuthMode(mode) {
   const loginForm = $("#loginForm");
@@ -256,50 +194,24 @@ function switchAuthMode(mode) {
     }
   }
 }
-  const loginPanel = $("#loginPanel");
-  const registerPanel = $("#registerPanel");
 
-  const loginTab = $("#loginTab");
-  const registerTab = $("#registerTab");
+function openAuthModal(mode = "login") {
+  const modal = $("#authModal");
 
-  const loginMessage = $("#loginMessage");
-  const registerMessage = $("#registerMessage");
+  if (!modal) {
+    console.error("PayaCircle: authModal was not found.");
+    return;
+  }
 
-  const normalizedMode =
-    String(mode).toLowerCase() === "register"
-      ? "register"
-      : "login";
+  show(modal);
+  switchAuthMode(mode);
+}
 
-  if (normalizedMode === "login") {
-    if (loginPanel) show(loginPanel);
-    if (registerPanel) hide(registerPanel);
+function closeAuthModal() {
+  const modal = $("#authModal");
 
-    if (loginTab) {
-      loginTab.classList.add("active");
-      loginTab.setAttribute("aria-selected", "true");
-    }
-
-    if (registerTab) {
-      registerTab.classList.remove("active");
-      registerTab.setAttribute("aria-selected", "false");
-    }
-
-    if (loginMessage) loginMessage.textContent = "";
-  } else {
-    if (registerPanel) show(registerPanel);
-    if (loginPanel) hide(loginPanel);
-
-    if (registerTab) {
-      registerTab.classList.add("active");
-      registerTab.setAttribute("aria-selected", "true");
-    }
-
-    if (loginTab) {
-      loginTab.classList.remove("active");
-      loginTab.setAttribute("aria-selected", "false");
-    }
-
-    if (registerMessage) registerMessage.textContent = "";
+  if (modal) {
+    hide(modal);
   }
 }
 
@@ -390,23 +302,24 @@ function bindAuthModal() {
     });
   }
 
-  const showLoginLinks = $$(".show-login");
-  const showRegisterLinks = $$(".show-register");
-
-  showLoginLinks.forEach((element) => {
+  $$(".show-login").forEach((element) => {
     element.addEventListener("click", (event) => {
       event.preventDefault();
       switchAuthMode("login");
     });
   });
 
-  showRegisterLinks.forEach((element) => {
+  $$(".show-register").forEach((element) => {
     element.addEventListener("click", (event) => {
       event.preventDefault();
       switchAuthMode("register");
     });
   });
 }
+
+/* =========================================================
+   REGISTER
+========================================================= */
 
 async function registerUser(event) {
   event.preventDefault();
@@ -461,9 +374,9 @@ async function registerUser(event) {
         "Account created successfully.";
     }
 
-    setTimeout(() => {
+    setTimeout(async () => {
       closeAuthModal();
-      loadAccount();
+      await loadAccount();
     }, 500);
   } catch (error) {
     if (message) {
@@ -477,6 +390,10 @@ async function registerUser(event) {
     }
   }
 }
+
+/* =========================================================
+   LOGIN
+========================================================= */
 
 async function loginUser(event) {
   event.preventDefault();
@@ -552,6 +469,10 @@ function bindForms() {
   }
 }
 
+/* =========================================================
+   CURRENT USER / ACCOUNT
+========================================================= */
+
 async function getCurrentUser() {
   try {
     const data = await api("/me");
@@ -587,7 +508,11 @@ async function loadAccount() {
 
     activateAccountPanel("overview");
   } catch (error) {
-    console.error("PayaCircle account error:", error);
+    console.error(
+      "PayaCircle account error:",
+      error
+    );
+
     showPublicSite();
   }
 }
@@ -596,28 +521,32 @@ function renderUserInformation(user) {
   const nameElements = [
     "#accountUserName",
     "#profileUserName",
-    "#dashboardUserName"
+    "#dashboardUserName",
+    "#profileMenuName"
   ];
 
   nameElements.forEach((selector) => {
     const element = $(selector);
 
     if (element) {
-      element.textContent = user?.name || "Member";
+      element.textContent =
+        user?.name || "Member";
     }
   });
 
   const emailElements = [
     "#accountUserEmail",
     "#profileUserEmail",
-    "#dashboardUserEmail"
+    "#dashboardUserEmail",
+    "#profileMenuEmail"
   ];
 
   emailElements.forEach((selector) => {
     const element = $(selector);
 
     if (element) {
-      element.textContent = user?.email || "";
+      element.textContent =
+        user?.email || "";
     }
   });
 }
@@ -651,6 +580,10 @@ function renderAccountBalance(user) {
 
   element.textContent = money(total);
 }
+
+/* =========================================================
+   MEMBERSHIPS
+========================================================= */
 
 function renderMemberships(user) {
   const container = $("#accountMemberships");
@@ -696,7 +629,8 @@ function renderMemberships(user) {
 
               <span class="membership-status">
                 ${escapeHTML(
-                  membership.status || "RESERVED"
+                  membership.status ||
+                  "RESERVED"
                 )}
               </span>
             </div>
@@ -710,7 +644,9 @@ function renderMemberships(user) {
             <div>
               <span>Circle</span>
               <strong>
-                ${escapeHTML(circle.code || "—")}
+                ${escapeHTML(
+                  circle.code || "—"
+                )}
               </strong>
             </div>
 
@@ -728,7 +664,9 @@ function renderMemberships(user) {
             <button
               type="button"
               class="secondary view-circle-button"
-              data-circle-id="${escapeHTML(circle.id || "")}"
+              data-circle-id="${escapeHTML(
+                circle.id || ""
+              )}"
             >
               View Circle
             </button>
@@ -756,7 +694,9 @@ function renderMemberships(user) {
 
   $$(".view-circle-button").forEach((button) => {
     button.addEventListener("click", () => {
-      openCircleDetails(button.dataset.circleId);
+      openCircleDetails(
+        button.dataset.circleId
+      );
     });
   });
 
@@ -768,6 +708,10 @@ function renderMemberships(user) {
     });
   });
 }
+
+/* =========================================================
+   CANCEL MEMBERSHIP
+========================================================= */
 
 function confirmCancellation(membershipId) {
   if (!membershipId) return;
@@ -860,6 +804,10 @@ async function cancelMembership(membershipId) {
   }
 }
 
+/* =========================================================
+   PAYMENTS
+========================================================= */
+
 async function loadPayments() {
   const container = $("#accountPayments");
 
@@ -922,6 +870,10 @@ async function loadPayments() {
     `;
   }
 }
+
+/* =========================================================
+   PAYOUTS
+========================================================= */
 
 async function loadPayouts() {
   const container = $("#accountPayouts");
@@ -986,6 +938,10 @@ async function loadPayouts() {
   }
 }
 
+/* =========================================================
+   ACCOUNT NAVIGATION
+========================================================= */
+
 function activateAccountPanel(panelName) {
   const panels = $$(
     "[data-account-panel]"
@@ -1036,6 +992,10 @@ function bindAccountNavigation() {
   );
 }
 
+/* =========================================================
+   PROFILE MENU
+========================================================= */
+
 function bindProfileMenu() {
   const button = $("#profileMenuButton");
   const menu = $("#profileMenu");
@@ -1055,13 +1015,17 @@ function bindProfileMenu() {
   });
 }
 
+/* =========================================================
+   LOGOUT
+========================================================= */
+
 async function logoutUser() {
   try {
     await api("/logout", {
       method: "POST"
     });
   } catch {
-    // Continue to local logout even if server logout fails.
+    // Continue with local logout.
   }
 
   currentUser = null;
@@ -1072,13 +1036,17 @@ async function logoutUser() {
 
 function bindLogoutButtons() {
   $$("[data-logout]").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      event.preventDefault();
-      await logoutUser();
-    });
+    button.addEventListener(
+      "click",
+      async (event) => {
+        event.preventDefault();
+        await logoutUser();
+      }
+    );
   });
 
-  const logoutButton = $("#logoutButton");
+  const logoutButton =
+    $("#logoutButton");
 
   if (logoutButton) {
     logoutButton.addEventListener(
@@ -1091,19 +1059,25 @@ function bindLogoutButtons() {
   }
 }
 
+/* =========================================================
+   GENERAL MODALS
+========================================================= */
+
 function bindModalButtons() {
-  $$("[data-close-modal]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const modalId =
-        button.dataset.closeModal;
+  $$("[data-close-modal]").forEach(
+    (button) => {
+      button.addEventListener("click", () => {
+        const modalId =
+          button.dataset.closeModal;
 
-      const modal = modalId
-        ? $(`#${modalId}`)
-        : button.closest(".modal");
+        const modal = modalId
+          ? $(`#${modalId}`)
+          : button.closest(".modal");
 
-      hide(modal);
-    });
-  });
+        hide(modal);
+      });
+    }
+  );
 
   $$(".modal").forEach((modal) => {
     modal.addEventListener("click", (event) => {
@@ -1114,8 +1088,13 @@ function bindModalButtons() {
   });
 }
 
+/* =========================================================
+   PUBLIC CIRCLES
+========================================================= */
+
 async function loadPublicCircles() {
-  const container = $("#publicCircles");
+  const container =
+    $("#publicCircles");
 
   if (!container) return;
 
@@ -1162,15 +1141,21 @@ async function loadPublicCircles() {
               <p>
                 Contribution:
                 <strong>
-                  ${money(circle.amountCents)}
+                  ${money(
+                    circle.amountCents
+                  )}
                 </strong>
               </p>
 
               <p>
                 Members:
-                ${Number(circle.memberCount || 0)}
+                ${Number(
+                  circle.memberCount || 0
+                )}
                 /
-                ${Number(circle.capacity || 0)}
+                ${Number(
+                  circle.capacity || 0
+                )}
               </p>
             </div>
 
@@ -1190,11 +1175,14 @@ async function loadPublicCircles() {
 
     $$(".public-circle-button").forEach(
       (button) => {
-        button.addEventListener("click", () => {
-          openCircleDetails(
-            button.dataset.circleId
-          );
-        });
+        button.addEventListener(
+          "click",
+          () => {
+            openCircleDetails(
+              button.dataset.circleId
+            );
+          }
+        );
       }
     );
   } catch (error) {
@@ -1202,18 +1190,27 @@ async function loadPublicCircles() {
       <div class="empty-state">
         <strong>Unable to load circles</strong>
         <span>
-          ${escapeHTML(error.message)}
+          ${escapeHTML(
+            error.message
+          )}
         </span>
       </div>
     `;
   }
 }
 
+/* =========================================================
+   CIRCLE DETAILS
+========================================================= */
+
 async function openCircleDetails(circleId) {
   if (!circleId) return;
 
-  const modal = $("#circleDetailsModal");
-  const content = $("#circleDetailsContent");
+  const modal =
+    $("#circleDetailsModal");
+
+  const content =
+    $("#circleDetailsContent");
 
   if (!modal || !content) return;
 
@@ -1255,7 +1252,9 @@ async function openCircleDetails(circleId) {
       dates =
         Array.isArray(dateData)
           ? dateData
-          : Array.isArray(dateData.dates)
+          : Array.isArray(
+              dateData.dates
+            )
           ? dateData.dates
           : [];
     } catch {
@@ -1281,19 +1280,24 @@ async function openCircleDetails(circleId) {
         <p>
           Contribution:
           <strong>
-            ${money(circle.amountCents)}
+            ${money(
+              circle.amountCents
+            )}
           </strong>
         </p>
 
         <p>
           Capacity:
-          ${Number(circle.capacity || 0)}
+          ${Number(
+            circle.capacity || 0
+          )}
         </p>
 
         <p>
           Status:
           ${escapeHTML(
-            circle.status || "COLLECTING"
+            circle.status ||
+            "COLLECTING"
           )}
         </p>
 
@@ -1301,7 +1305,9 @@ async function openCircleDetails(circleId) {
           dates.length
             ? `
               <div class="circle-dates">
-                <h3>Available payout dates</h3>
+                <h3>
+                  Available payout dates
+                </h3>
 
                 ${dates
                   .map(
@@ -1364,21 +1370,34 @@ async function openCircleDetails(circleId) {
   } catch (error) {
     content.innerHTML = `
       <div class="empty-state">
-        <strong>Unable to open circle</strong>
+        <strong>
+          Unable to open circle
+        </strong>
+
         <span>
-          ${escapeHTML(error.message)}
+          ${escapeHTML(
+            error.message
+          )}
         </span>
       </div>
     `;
   }
 }
 
+/* =========================================================
+   RESERVE MEMBERSHIP
+========================================================= */
+
 async function reserveMembership(circleId) {
   if (!circleId) return;
 
   if (!currentUser) {
-    closeModalById("circleDetailsModal");
+    closeModalById(
+      "circleDetailsModal"
+    );
+
     openAuthModal("login");
+
     return;
   }
 
@@ -1400,7 +1419,8 @@ async function reserveMembership(circleId) {
       method: "POST",
       body: JSON.stringify({
         circleId,
-        payoutDateId: selected.value
+        payoutDateId:
+          selected.value
       })
     });
 
@@ -1408,7 +1428,9 @@ async function reserveMembership(circleId) {
       "Your circle membership has been reserved."
     );
 
-    closeModalById("circleDetailsModal");
+    closeModalById(
+      "circleDetailsModal"
+    );
 
     await loadAccount();
   } catch (error) {
@@ -1420,39 +1442,63 @@ async function reserveMembership(circleId) {
 }
 
 function closeModalById(id) {
-  const modal = id ? $(`#${id}`) : null;
+  const modal =
+    id ? $(`#${id}`) : null;
 
   if (modal) {
     hide(modal);
   }
 }
 
+/* =========================================================
+   PUBLIC NAVIGATION
+========================================================= */
+
 function bindPublicNavigation() {
-  $$("[data-scroll-to]").forEach((link) => {
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
+  $$("[data-scroll-to]").forEach(
+    (link) => {
+      link.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault();
 
-      const target =
-        document.getElementById(
-          link.dataset.scrollTo
-        );
+          const target =
+            document.getElementById(
+              link.dataset.scrollTo
+            );
 
-      if (target) {
-        target.scrollIntoView({
-          behavior: "smooth",
-          block: "start"
-        });
-      }
-    });
-  });
+          if (target) {
+            target.scrollIntoView({
+              behavior: "smooth",
+              block: "start"
+            });
+          }
+        }
+      );
+    }
+  );
 }
+
+/* =========================================================
+   PAYPAL
+========================================================= */
 
 function bindPayPalButtons() {
-  // PayPal buttons are created only after
-  // a membership/payment flow is started.
+  // PayPal buttons are initialized
+  // when the payment flow is started.
 }
 
+/* =========================================================
+   INITIALIZATION
+========================================================= */
+
 async function initialize() {
+  /*
+    Bind all buttons and forms FIRST.
+    Public circle loading must never
+    prevent authentication from working.
+  */
+
   bindAuthButtons();
   bindAuthModal();
   bindAccountNavigation();
@@ -1463,8 +1509,6 @@ async function initialize() {
   bindPublicNavigation();
   bindPayPalButtons();
 
-  // Public circles must never prevent
-  // authentication from initializing.
   loadPublicCircles().catch((error) => {
     console.error(
       "PayaCircle public circles error:",
@@ -1472,7 +1516,8 @@ async function initialize() {
     );
   });
 
-  const user = await getCurrentUser();
+  const user =
+    await getCurrentUser();
 
   if (user) {
     currentUser = user;
@@ -1481,6 +1526,10 @@ async function initialize() {
     showPublicSite();
   }
 }
+
+/* =========================================================
+   START APP
+========================================================= */
 
 document.addEventListener(
   "DOMContentLoaded",
