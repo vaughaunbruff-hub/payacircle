@@ -521,6 +521,56 @@ function toggleProfileMenu(event) {
 }
 
 function bindProfileMenu() {
+  const profileButton = $("#accountProfileTrigger");
+  const mobileProfileButton = $("#mobileProfileButton");
+
+  if (profileButton) {
+    profileButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleProfileMenu();
+    });
+
+    profileButton.setAttribute("aria-expanded", "false");
+  }
+
+  if (mobileProfileButton) {
+    mobileProfileButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleProfileMenu();
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    const menu = $("#accountProfileMenu");
+
+    if (!menu || menu.style.display !== "block") {
+      return;
+    }
+
+    const clickedProfileButton =
+      profileButton &&
+      (profileButton === event.target ||
+        profileButton.contains(event.target));
+
+    const clickedMobileButton =
+      mobileProfileButton &&
+      (mobileProfileButton === event.target ||
+        mobileProfileButton.contains(event.target));
+
+    const clickedInsideMenu =
+      menu.contains(event.target);
+
+    if (
+      !clickedInsideMenu &&
+      !clickedProfileButton &&
+      !clickedMobileButton
+    ) {
+      closeProfileMenu();
+    }
+  });
+}
   /*
     Support the profile button regardless of which selector
     the HTML currently uses.
