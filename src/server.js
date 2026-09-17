@@ -95,7 +95,10 @@ function auth(req, res, next) {
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(
+      token,
+      JWT_SECRET
+    );
 
     req.user = decoded;
 
@@ -137,8 +140,13 @@ function paypalBaseUrl() {
 }
 
 async function paypalAccessToken() {
-  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
-    throw new Error("PayPal is not configured");
+  if (
+    !PAYPAL_CLIENT_ID ||
+    !PAYPAL_CLIENT_SECRET
+  ) {
+    throw new Error(
+      "PayPal is not configured"
+    );
   }
 
   const credentials = Buffer.from(
@@ -154,7 +162,8 @@ async function paypalAccessToken() {
         "Content-Type":
           "application/x-www-form-urlencoded"
       },
-      body: "grant_type=client_credentials"
+      body:
+        "grant_type=client_credentials"
     }
   );
 
@@ -171,16 +180,22 @@ async function paypalAccessToken() {
   return data.access_token;
 }
 
-async function paypalRequest(path, options = {}) {
-  const accessToken = await paypalAccessToken();
+async function paypalRequest(
+  path,
+  options = {}
+) {
+  const accessToken =
+    await paypalAccessToken();
 
   const response = await fetch(
     `${paypalBaseUrl()}${path}`,
     {
       ...options,
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
+        Authorization:
+          `Bearer ${accessToken}`,
+        "Content-Type":
+          "application/json",
         ...(options.headers || {})
       }
     }
@@ -191,11 +206,15 @@ async function paypalRequest(path, options = {}) {
   if (!response.ok) {
     const message =
       data?.message ||
-      data?.details?.[0]?.description ||
+      data?.details?.[0]
+        ?.description ||
       "PayPal request failed";
 
     const error = new Error(message);
-    error.status = response.status;
+
+    error.status =
+      response.status;
+
     error.paypal = data;
 
     throw error;
@@ -208,227 +227,290 @@ async function paypalRequest(path, options = {}) {
    HEALTH
 --------------------------------- */
 
-app.get("/api/health", async (_, res) => {
-  res.json({
-    ok: true,
-    app: "PayaCircle",
-    mode: PAYPAL_MODE
-  });
-});
+app.get(
+  "/api/health",
+  async (_, res) => {
+    res.json({
+      ok: true,
+      app: "PayaCircle",
+      mode: PAYPAL_MODE
+    });
+  }
+);
 
 /* --------------------------------
    REGISTER
 --------------------------------- */
 
-app.post("/api/register", async (req, res) => {
-  const parsed = z
-    .object({
-      name: z.string().trim().min(2).max(100),
-      email: z.string().email(),
-      password: z.string().min(8).max(100)
-    })
-    .safeParse(req.body);
+app.post(
+  "/api/register",
+  async (req, res) => {
+    const parsed = z
+      .object({
+        name: z
+          .string()
+          .trim()
+          .min(2)
+          .max(100),
 
-  if (!parsed.success) {
-    return res.status(400).json({
-      error:
-        "Please provide a valid name, email and password of at least 8 characters"
+        email: z
+          .string()
+          .email(),
+
+        password: z
+          .string()
+          .min(8)
+          .max(100)
+      })
+      .safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error:
+          "Please provide a valid name, email and password of at least 8 characters"
+      });
+    }
+
+    const name =
+      parsed.data.name.trim();
+
+    const email =
+      parsed.data.email
+        .trim()
+        .toLowerCase();
+
+    const existing =
+      await prisma.user.findUnique({
+        where: {
+          email
+        }
+      });
+
+    if (existing) {
+      return res.status(409).json({
+        error:
+          "An account with that email already exists"
+      });
+    }
+
+    const passwordHash =
+      await bcrypt.hash(
+        parsed.data.password,
+        12
+      );
+
+    const user =
+      await prisma.user.create({
+        data: {
+          name,
+          email,
+          passwordHash
+        }
+      });
+
+    res.cookie(
+      "cp_session",
+      tokenFor(user),
+      sessionCookieOptions()
+    );
+
+    res.status(201).json({
+      name: user.name,
+      email: user.email,
+      role: user.role
     });
   }
-
-  const name = parsed.data.name.trim();
-  const email = parsed.data.email.trim().toLowerCase();
-
-  const existing = await prisma.user.findUnique({
-    where: {
-      email
-    }
-  });
-
-  if (existing) {
-    return res.status(409).json({
-      error: "An account with that email already exists"
-    });
-  }
-
-  const passwordHash = await bcrypt.hash(
-    parsed.data.password,
-    12
-  );
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash
-    }
-  });
-
-  res.cookie(
-    "cp_session",
-    tokenFor(user),
-    sessionCookieOptions()
-  );
-
-  res.status(201).json({
-    name: user.name,
-    email: user.email,
-    role: user.role
-  });
-});
+);
 
 /* --------------------------------
    LOGIN
 --------------------------------- */
 
-app.post("/api/login", async (req, res) => {
-  const parsed = z
-    .object({
-      email: z.string().email(),
-      password: z.string()
-    })
-    .safeParse(req.body);
+app.post(
+  "/api/login",
+  async (req, res) => {
+    const parsed = z
+      .object({
+        email: z
+          .string()
+          .email(),
 
-  if (!parsed.success) {
-    return res.status(400).json({
-      error: "Invalid login"
-    });
-  }
+        password:
+          z.string()
+      })
+      .safeParse(req.body);
 
-  const user = await prisma.user.findUnique({
-    where: {
-      email: parsed.data.email.trim().toLowerCase()
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Invalid login"
+      });
     }
-  });
 
-  if (
-    !user ||
-    !(await bcrypt.compare(
-      parsed.data.password,
-      user.passwordHash
-    ))
-  ) {
-    return res.status(401).json({
-      error: "Incorrect email or password"
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          email:
+            parsed.data.email
+              .trim()
+              .toLowerCase()
+        }
+      });
+
+    if (
+      !user ||
+      !(await bcrypt.compare(
+        parsed.data.password,
+        user.passwordHash
+      ))
+    ) {
+      return res.status(401).json({
+        error:
+          "Incorrect email or password"
+      });
+    }
+
+    res.cookie(
+      "cp_session",
+      tokenFor(user),
+      sessionCookieOptions()
+    );
+
+    res.json({
+      name: user.name,
+      email: user.email,
+      role: user.role
     });
   }
-
-  res.cookie(
-    "cp_session",
-    tokenFor(user),
-    sessionCookieOptions()
-  );
-
-  res.json({
-    name: user.name,
-    email: user.email,
-    role: user.role
-  });
-});
+);
 
 /* --------------------------------
    LOGOUT
 --------------------------------- */
 
-app.post("/api/logout", (req, res) => {
-  res.clearCookie("cp_session", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/"
-  });
+app.post(
+  "/api/logout",
+  (req, res) => {
+    res.clearCookie(
+      "cp_session",
+      {
+        httpOnly: true,
+        secure:
+          process.env.NODE_ENV ===
+          "production",
+        sameSite: "lax",
+        path: "/"
+      }
+    );
 
-  res.json({
-    ok: true
-  });
-});
+    res.json({
+      ok: true
+    });
+  }
+);
 
 /* --------------------------------
    CURRENT USER
 --------------------------------- */
 
-app.get("/api/me", auth, async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: req.user.id
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      paypalEmail: true,
-      role: true,
-      createdAt: true,
-      memberships: {
-        orderBy: {
-          createdAt: "desc"
+app.get(
+  "/api/me",
+  auth,
+  async (req, res) => {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: req.user.id
         },
-        include: {
-          circle: true,
-          payoutDate: true,
-          payments: true,
-          payout: true
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          paypalEmail: true,
+          role: true,
+          createdAt: true,
+
+          memberships: {
+            orderBy: {
+              createdAt: "desc"
+            },
+
+            include: {
+              circle: true,
+              payoutDate: true,
+              payments: true,
+              payout: true
+            }
+          }
         }
-      }
+      });
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found"
+      });
     }
-  });
 
-  if (!user) {
-    return res.status(404).json({
-      error: "User not found"
-    });
+    res.json(user);
   }
-
-  res.json(user);
-});
+);
 
 /* --------------------------------
    PUBLIC CIRCLES
 --------------------------------- */
 
-app.get("/api/circles", async (_, res) => {
-  const circles = await prisma.circle.findMany({
-    include: {
-      _count: {
-        select: {
-          memberships: true
-        }
-      }
-    },
-    orderBy: {
-      createdAt: "desc"
-    }
-  });
+app.get(
+  "/api/circles",
+  async (_, res) => {
+    const circles =
+      await prisma.circle.findMany({
+        include: {
+          _count: {
+            select: {
+              memberships: true
+            }
+          }
+        },
 
-  res.json(circles);
-});
+        orderBy: {
+          createdAt: "desc"
+        }
+      });
+
+    res.json(circles);
+  }
+);
 
 /* --------------------------------
    SINGLE CIRCLE
 --------------------------------- */
 
-app.get("/api/circles/:id", async (req, res) => {
-  const circle = await prisma.circle.findUnique({
-    where: {
-      id: req.params.id
-    },
-    include: {
-      _count: {
-        select: {
-          memberships: true
+app.get(
+  "/api/circles/:id",
+  async (req, res) => {
+    const circle =
+      await prisma.circle.findUnique({
+        where: {
+          id: req.params.id
+        },
+
+        include: {
+          _count: {
+            select: {
+              memberships: true
+            }
+          }
         }
-      }
+      });
+
+    if (!circle) {
+      return res.status(404).json({
+        error: "Circle not found"
+      });
     }
-  });
 
-  if (!circle) {
-    return res.status(404).json({
-      error: "Circle not found"
-    });
+    res.json(circle);
   }
-
-  res.json(circle);
-});
+);
 
 /* --------------------------------
    CIRCLE PAYOUT DATES
@@ -438,14 +520,17 @@ app.get(
   "/api/circles/:id/dates",
   auth,
   async (req, res) => {
-    const dates = await prisma.payoutDate.findMany({
-      where: {
-        circleId: req.params.id
-      },
-      orderBy: {
-        payoutAt: "asc"
-      }
-    });
+    const dates =
+      await prisma.payoutDate.findMany({
+        where: {
+          circleId:
+            req.params.id
+        },
+
+        orderBy: {
+          payoutAt: "asc"
+        }
+      });
 
     res.json(dates);
   }
@@ -459,22 +544,26 @@ app.post(
   "/api/memberships/:id/cancel",
   auth,
   async (req, res) => {
-    const membershipId = req.params.id;
+    const membershipId =
+      req.params.id;
 
     try {
       const result =
         await prisma.$transaction(
           async (tx) => {
             const membership =
-              await tx.membership.findUnique({
-                where: {
-                  id: membershipId
-                },
-                include: {
-                  circle: true,
-                  payoutDate: true
+              await tx.membership.findUnique(
+                {
+                  where: {
+                    id: membershipId
+                  },
+
+                  include: {
+                    circle: true,
+                    payoutDate: true
+                  }
                 }
-              });
+              );
 
             if (!membership) {
               throw new Error(
@@ -486,11 +575,13 @@ app.post(
               membership.userId !==
               req.user.id
             ) {
-              const error = new Error(
-                "You cannot cancel this membership"
-              );
+              const error =
+                new Error(
+                  "You cannot cancel this membership"
+                );
 
               error.status = 403;
+
               throw error;
             }
 
@@ -505,15 +596,6 @@ app.post(
               );
             }
 
-            /*
-              A member can only cancel while
-              the circle is still collecting
-              members.
-
-              Once the circle has moved beyond
-              COLLECTING, cancellation is blocked.
-            */
-
             if (
               membership.circle.status !==
               "COLLECTING"
@@ -523,59 +605,63 @@ app.post(
               );
             }
 
-            /*
-              Paid memberships are not
-              automatically refunded here.
-              The payment/refund process must
-              be handled separately.
-            */
-
             const hasCapturedPayment =
-              await tx.payment.findFirst({
-                where: {
-                  membershipId:
-                    membership.id,
-                  status: "CAPTURED"
-                }
-              });
+              await tx.payment.findFirst(
+                {
+                  where: {
+                    membershipId:
+                      membership.id,
 
-            if (hasCapturedPayment) {
-              const error = new Error(
-                "This membership has already been paid. Please contact PayaCircle support to request a refund."
+                    status:
+                      "CAPTURED"
+                  }
+                }
               );
 
+            if (hasCapturedPayment) {
+              const error =
+                new Error(
+                  "This membership has already been paid. Please contact PayaCircle support to request a refund."
+                );
+
               error.status = 409;
+
               throw error;
             }
 
             const updated =
-              await tx.membership.update({
-                where: {
-                  id: membership.id
-                },
-                data: {
-                  status: "CANCELLED"
-                },
-                include: {
-                  circle: true,
-                  payoutDate: true
+              await tx.membership.update(
+                {
+                  where: {
+                    id: membership.id
+                  },
+
+                  data: {
+                    status:
+                      "CANCELLED"
+                  },
+
+                  include: {
+                    circle: true,
+                    payoutDate: true
+                  }
                 }
-              });
+              );
 
-            /*
-              Release the payout-date reservation.
-            */
+            await tx.payoutDate.update(
+              {
+                where: {
+                  id:
+                    membership.payoutDateId
+                },
 
-            await tx.payoutDate.update({
-              where: {
-                id: membership.payoutDateId
-              },
-              data: {
-                reserved: {
-                  decrement: 1
+                data: {
+                  reserved: {
+                    decrement: 1
+                  }
                 }
               }
-            });
+            );
 
             return updated;
           }
@@ -583,9 +669,12 @@ app.post(
 
       res.json({
         ok: true,
+
         message:
           "Your circle membership has been cancelled.",
-        membership: result
+
+        membership:
+          result
       });
     } catch (error) {
       const status =
@@ -662,7 +751,8 @@ app.post(
 
     if (!parsed.success) {
       return res.status(400).json({
-        error: "Invalid circle information"
+        error:
+          "Invalid circle information"
       });
     }
 
@@ -673,7 +763,11 @@ app.post(
       amountUsd
     } = parsed.data;
 
-    if (!validContribution(amountUsd)) {
+    if (
+      !validContribution(
+        amountUsd
+      )
+    ) {
       return res.status(400).json({
         error:
           "Contribution must be between $5 and $100 in $5 increments"
@@ -690,24 +784,162 @@ app.post(
       });
     }
 
-    const code =
-      `${type.slice(0, 4)}-` +
-      Date.now()
-        .toString(36)
-        .toUpperCase();
+    try {
+      const result =
+        await prisma.$transaction(
+          async (tx) => {
+            /*
+              Create the circle first.
+            */
 
-    const circle = await prisma.circle.create({
-      data: {
-        code,
-        name: name || null,
-        type,
-        amountCents: amountUsd * 100,
-        capacity,
-        houseFeeCents: 10000
-      }
-    });
+            const code =
+              `${type.slice(0, 4)}-` +
+              Date.now()
+                .toString(36)
+                .toUpperCase();
 
-    res.status(201).json(circle);
+            const circle =
+              await tx.circle.create({
+                data: {
+                  code,
+                  name:
+                    name || null,
+                  type,
+
+                  amountCents:
+                    amountUsd * 100,
+
+                  capacity,
+
+                  houseFeeCents:
+                    10000
+                }
+              });
+
+            /*
+              Create payout dates for
+              the circle.
+
+              Each member gets one
+              payout position.
+
+              We create one monthly
+              payout date for every
+              available member position.
+            */
+
+            const payoutDates = [];
+
+            const now =
+              new Date();
+
+            for (
+              let i = 0;
+              i < capacity;
+              i++
+            ) {
+              const payoutAt =
+                new Date(now);
+
+              payoutAt.setMonth(
+                payoutAt.getMonth() +
+                  i +
+                  1
+              );
+
+              payoutAt.setHours(
+                12,
+                0,
+                0,
+                0
+              );
+
+              const payoutDate =
+                await tx.payoutDate.create(
+                  {
+                    data: {
+                      circleId:
+                        circle.id,
+
+                      payoutAt,
+
+                      capacity: 1,
+
+                      reserved:
+                        i === 0
+                          ? 1
+                          : 0
+                    }
+                  }
+                );
+
+              payoutDates.push(
+                payoutDate
+              );
+            }
+
+            /*
+              IMPORTANT FIX:
+              The person creating the
+              circle automatically becomes
+              its first member.
+
+              The first payout position is
+              reserved for the creator.
+            */
+
+            const creatorMembership =
+              await tx.membership.create(
+                {
+                  data: {
+                    userId:
+                      req.user.id,
+
+                    circleId:
+                      circle.id,
+
+                    payoutDateId:
+                      payoutDates[0].id,
+
+                    status:
+                      "PAYMENT_PENDING"
+                  },
+
+                  include: {
+                    circle: true,
+                    payoutDate: true
+                  }
+                }
+              );
+
+            return {
+              circle,
+              membership:
+                creatorMembership
+            };
+          }
+        );
+
+      res.status(201).json({
+        ...result.circle,
+
+        membership:
+          result.membership
+      });
+    } catch (error) {
+      console.error(
+        "Create circle error:",
+        error
+      );
+
+      res.status(
+        error?.status || 500
+      ).json({
+        error:
+          error?.message ||
+          "Unable to create circle"
+      });
+    }
   }
 );
 
@@ -721,14 +953,18 @@ app.post(
   async (req, res) => {
     const parsed = z
       .object({
-        circleId: z.string().min(1),
-        payoutDateId: z.string().min(1)
+        circleId:
+          z.string().min(1),
+
+        payoutDateId:
+          z.string().min(1)
       })
       .safeParse(req.body);
 
     if (!parsed.success) {
       return res.status(400).json({
-        error: "Invalid membership request"
+        error:
+          "Invalid membership request"
       });
     }
 
@@ -742,18 +978,22 @@ app.post(
         await prisma.$transaction(
           async (tx) => {
             const circle =
-              await tx.circle.findUnique({
-                where: {
-                  id: circleId
-                },
-                include: {
-                  _count: {
-                    select: {
-                      memberships: true
+              await tx.circle.findUnique(
+                {
+                  where: {
+                    id: circleId
+                  },
+
+                  include: {
+                    _count: {
+                      select: {
+                        memberships:
+                          true
+                      }
                     }
                   }
                 }
-              });
+              );
 
             if (!circle) {
               throw new Error(
@@ -780,11 +1020,14 @@ app.post(
             }
 
             const payoutDate =
-              await tx.payoutDate.findUnique({
-                where: {
-                  id: payoutDateId
+              await tx.payoutDate.findUnique(
+                {
+                  where: {
+                    id:
+                      payoutDateId
+                  }
                 }
-              });
+              );
 
             if (!payoutDate) {
               throw new Error(
@@ -811,77 +1054,105 @@ app.post(
             }
 
             const existing =
-              await tx.membership.findUnique({
-                where: {
-                  userId_circleId: {
-                    userId: req.user.id,
-                    circleId
+              await tx.membership.findUnique(
+                {
+                  where: {
+                    userId_circleId: {
+                      userId:
+                        req.user.id,
+
+                      circleId
+                    }
                   }
                 }
-              });
+              );
 
             if (existing) {
               if (
                 existing.status ===
                 "CANCELLED"
               ) {
-                await tx.payoutDate.update({
-                  where: {
-                    id: existing.payoutDateId
-                  },
-                  data: {
-                    reserved: {
-                      increment: 1
+                await tx.payoutDate.update(
+                  {
+                    where: {
+                      id:
+                        existing.payoutDateId
+                    },
+
+                    data: {
+                      reserved: {
+                        increment: 1
+                      }
                     }
                   }
-                });
+                );
 
-                return tx.membership.update({
-                  where: {
-                    id: existing.id
-                  },
-                  data: {
-                    payoutDateId,
-                    status:
-                      "PAYMENT_PENDING"
-                  },
-                  include: {
-                    circle: true,
-                    payoutDate: true
+                return tx.membership.update(
+                  {
+                    where: {
+                      id:
+                        existing.id
+                    },
+
+                    data: {
+                      payoutDateId,
+
+                      status:
+                        "PAYMENT_PENDING"
+                    },
+
+                    include: {
+                      circle: true,
+                      payoutDate: true
+                    }
                   }
-                });
+                );
               }
 
               return existing;
             }
 
-            await tx.payoutDate.update({
-              where: {
-                id: payoutDateId
-              },
-              data: {
-                reserved: {
-                  increment: 1
+            await tx.payoutDate.update(
+              {
+                where: {
+                  id:
+                    payoutDateId
+                },
+
+                data: {
+                  reserved: {
+                    increment: 1
+                  }
                 }
               }
-            });
+            );
 
-            return tx.membership.create({
-              data: {
-                userId: req.user.id,
-                circleId,
-                payoutDateId,
-                status: "PAYMENT_PENDING"
-              },
-              include: {
-                circle: true,
-                payoutDate: true
+            return tx.membership.create(
+              {
+                data: {
+                  userId:
+                    req.user.id,
+
+                  circleId,
+
+                  payoutDateId,
+
+                  status:
+                    "PAYMENT_PENDING"
+                },
+
+                include: {
+                  circle: true,
+                  payoutDate: true
+                }
               }
-            });
+            );
           }
         );
 
-      res.status(201).json(membership);
+      res.status(201).json(
+        membership
+      );
     } catch (error) {
       const message =
         error?.message ||
@@ -890,7 +1161,9 @@ app.post(
       const status =
         message.includes("full")
           ? 409
-          : message.includes("not found")
+          : message.includes(
+              "not found"
+            )
           ? 404
           : 400;
 
@@ -911,55 +1184,74 @@ app.post(
   async (req, res) => {
     const parsed = z
       .object({
-        circleId: z.string().min(1),
-        membershipId: z
-          .string()
-          .min(1)
-          .optional()
+        circleId:
+          z.string().min(1),
+
+        membershipId:
+          z.string()
+            .min(1)
+            .optional()
       })
       .safeParse(req.body);
 
     if (!parsed.success) {
       return res.status(400).json({
-        error: "Invalid PayPal request"
+        error:
+          "Invalid PayPal request"
       });
     }
 
     try {
       const circle =
-        await prisma.circle.findUnique({
-          where: {
-            id: parsed.data.circleId
+        await prisma.circle.findUnique(
+          {
+            where: {
+              id:
+                parsed.data.circleId
+            }
           }
-        });
+        );
 
       if (!circle) {
         return res.status(404).json({
-          error: "Circle not found"
+          error:
+            "Circle not found"
         });
       }
 
       const amount =
         (
-          circle.amountCents / 100
+          circle.amountCents /
+          100
         ).toFixed(2);
 
       const existing =
-        await prisma.payment.findFirst({
-          where: {
-            userId: req.user.id,
-            circleId: circle.id,
-            status: "CREATED",
-            paypalOrderId: {
-              not: null
-            }
-          },
-          orderBy: {
-            createdAt: "desc"
-          }
-        });
+        await prisma.payment.findFirst(
+          {
+            where: {
+              userId:
+                req.user.id,
 
-      if (existing?.paypalOrderId) {
+              circleId:
+                circle.id,
+
+              status:
+                "CREATED",
+
+              paypalOrderId: {
+                not: null
+              }
+            },
+
+            orderBy: {
+              createdAt: "desc"
+            }
+          }
+        );
+
+      if (
+        existing?.paypalOrderId
+      ) {
         return res.json({
           orderId:
             existing.paypalOrderId
@@ -971,32 +1263,46 @@ app.post(
           "/v2/checkout/orders",
           {
             method: "POST",
+
             headers: {
               Prefer:
                 "return=representation"
             },
+
             body: JSON.stringify({
               intent: "CAPTURE",
+
               purchase_units: [
                 {
                   reference_id:
                     circle.id,
+
                   description:
                     `PayaCircle contribution - ${circle.code}`,
+
                   amount: {
-                    currency_code: "USD",
-                    value: amount
+                    currency_code:
+                      "USD",
+
+                    value:
+                      amount
                   }
                 }
               ],
+
               application_context: {
-                brand_name: "PayaCircle",
+                brand_name:
+                  "PayaCircle",
+
                 landing_page:
                   "LOGIN",
+
                 user_action:
                   "PAY_NOW",
+
                 return_url:
                   `${APP_URL}/?paypal=success`,
+
                 cancel_url:
                   `${APP_URL}/?paypal=cancel`
               }
@@ -1005,28 +1311,44 @@ app.post(
         );
 
       const payment =
-        await prisma.payment.create({
-          data: {
-            userId: req.user.id,
-            circleId: circle.id,
-            membershipId:
-              parsed.data.membershipId ||
-              null,
-            paypalOrderId:
-              order.id,
-            amountCents:
-              circle.amountCents,
-            status: "CREATED"
+        await prisma.payment.create(
+          {
+            data: {
+              userId:
+                req.user.id,
+
+              circleId:
+                circle.id,
+
+              membershipId:
+                parsed.data
+                  .membershipId ||
+                null,
+
+              paypalOrderId:
+                order.id,
+
+              amountCents:
+                circle.amountCents,
+
+              status:
+                "CREATED"
+            }
           }
-        });
+        );
 
       res.json({
-        orderId: order.id,
-        paymentId: payment.id,
+        orderId:
+          order.id,
+
+        paymentId:
+          payment.id,
+
         approvalUrl:
           order.links?.find(
             (link) =>
-              link.rel === "approve"
+              link.rel ===
+              "approve"
           )?.href || null
       });
     } catch (error) {
@@ -1056,32 +1378,38 @@ app.post(
   async (req, res) => {
     const parsed = z
       .object({
-        orderId: z.string().min(1)
+        orderId:
+          z.string().min(1)
       })
       .safeParse(req.body);
 
     if (!parsed.success) {
       return res.status(400).json({
-        error: "Invalid PayPal order"
+        error:
+          "Invalid PayPal order"
       });
     }
 
     try {
       const payment =
-        await prisma.payment.findUnique({
-          where: {
-            paypalOrderId:
-              parsed.data.orderId
-          },
-          include: {
-            circle: true,
-            membership: true
+        await prisma.payment.findUnique(
+          {
+            where: {
+              paypalOrderId:
+                parsed.data.orderId
+            },
+
+            include: {
+              circle: true,
+              membership: true
+            }
           }
-        });
+        );
 
       if (!payment) {
         return res.status(404).json({
-          error: "Payment not found"
+          error:
+            "Payment not found"
         });
       }
 
@@ -1122,7 +1450,8 @@ app.post(
       ) {
         return res.json({
           ok: true,
-          status: "CAPTURED",
+          status:
+            "CAPTURED",
           payment
         });
       }
@@ -1134,10 +1463,12 @@ app.post(
           )}/capture`,
           {
             method: "POST",
+
             headers: {
               Prefer:
                 "return=representation"
             },
+
             body: "{}"
           }
         );
@@ -1155,7 +1486,8 @@ app.post(
 
       const expectedAmount =
         (
-          payment.amountCents / 100
+          payment.amountCents /
+          100
         ).toFixed(2);
 
       if (
@@ -1164,14 +1496,19 @@ app.post(
         capturedAmount !==
           expectedAmount
       ) {
-        await prisma.payment.update({
-          where: {
-            id: payment.id
-          },
-          data: {
-            status: "FAILED"
+        await prisma.payment.update(
+          {
+            where: {
+              id:
+                payment.id
+            },
+
+            data: {
+              status:
+                "FAILED"
+            }
           }
-        });
+        );
 
         return res.status(400).json({
           error:
@@ -1183,42 +1520,55 @@ app.post(
         await prisma.$transaction(
           async (tx) => {
             const updated =
-              await tx.payment.update({
-                where: {
-                  id: payment.id
-                },
-                data: {
-                  status: "CAPTURED",
-                  paypalCaptureId:
-                    captureData?.id ||
-                    null,
-                  paypalFeeCents:
-                    captureData
-                      ?.seller_receivable_breakdown
-                      ?.paypal_fee
-                      ?.value
-                      ? Math.round(
-                          Number(
-                            captureData
-                              .seller_receivable_breakdown
-                              .paypal_fee.value
-                          ) * 100
-                        )
-                      : null
+              await tx.payment.update(
+                {
+                  where: {
+                    id:
+                      payment.id
+                  },
+
+                  data: {
+                    status:
+                      "CAPTURED",
+
+                    paypalCaptureId:
+                      captureData?.id ||
+                      null,
+
+                    paypalFeeCents:
+                      captureData
+                        ?.seller_receivable_breakdown
+                        ?.paypal_fee
+                        ?.value
+                        ? Math.round(
+                            Number(
+                              captureData
+                                .seller_receivable_breakdown
+                                .paypal_fee
+                                .value
+                            ) * 100
+                          )
+                        : null
+                  }
                 }
-              });
+              );
 
             if (
               payment.membershipId
             ) {
-              await tx.membership.update({
-                where: {
-                  id: payment.membershipId
-                },
-                data: {
-                  status: "PAID"
+              await tx.membership.update(
+                {
+                  where: {
+                    id:
+                      payment.membershipId
+                  },
+
+                  data: {
+                    status:
+                      "PAID"
+                  }
                 }
-              });
+              );
             }
 
             return updated;
@@ -1227,7 +1577,10 @@ app.post(
 
       res.json({
         ok: true,
-        status: "CAPTURED",
+
+        status:
+          "CAPTURED",
+
         payment:
           updatedPayment
       });
@@ -1238,22 +1591,29 @@ app.post(
       );
 
       try {
-        await prisma.payment.updateMany({
-          where: {
-            paypalOrderId:
-              parsed.data.orderId,
-            userId: req.user.id,
-            status: {
-              in: [
-                "CREATED",
-                "APPROVED"
-              ]
+        await prisma.payment.updateMany(
+          {
+            where: {
+              paypalOrderId:
+                parsed.data.orderId,
+
+              userId:
+                req.user.id,
+
+              status: {
+                in: [
+                  "CREATED",
+                  "APPROVED"
+                ]
+              }
+            },
+
+            data: {
+              status:
+                "FAILED"
             }
-          },
-          data: {
-            status: "FAILED"
           }
-        });
+        );
       } catch {
         // Ignore secondary update error.
       }
@@ -1278,7 +1638,8 @@ app.post(
   async (req, res) => {
     console.log(
       "PayPal webhook received:",
-      req.body?.event_type || "unknown"
+      req.body?.event_type ||
+        "unknown"
     );
 
     res.json({
@@ -1296,18 +1657,23 @@ app.get(
   auth,
   async (req, res) => {
     const payments =
-      await prisma.payment.findMany({
-        where: {
-          userId: req.user.id
-        },
-        include: {
-          circle: true,
-          membership: true
-        },
-        orderBy: {
-          createdAt: "desc"
+      await prisma.payment.findMany(
+        {
+          where: {
+            userId:
+              req.user.id
+          },
+
+          include: {
+            circle: true,
+            membership: true
+          },
+
+          orderBy: {
+            createdAt: "desc"
+          }
         }
-      });
+      );
 
     res.json(payments);
   }
@@ -1322,19 +1688,24 @@ app.get(
   auth,
   async (req, res) => {
     const payouts =
-      await prisma.payout.findMany({
-        where: {
-          userId: req.user.id
-        },
-        include: {
-          circle: true,
-          payoutDate: true,
-          membership: true
-        },
-        orderBy: {
-          createdAt: "desc"
+      await prisma.payout.findMany(
+        {
+          where: {
+            userId:
+              req.user.id
+          },
+
+          include: {
+            circle: true,
+            payoutDate: true,
+            membership: true
+          },
+
+          orderBy: {
+            createdAt: "desc"
+          }
         }
-      });
+      );
 
     res.json(payouts);
   }
@@ -1399,11 +1770,15 @@ app.use(
    START SERVER
 --------------------------------- */
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `PayaCircle running on port ${PORT}`
-  );
-});
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `PayaCircle running on port ${PORT}`
+    );
+  }
+);
 
 /* --------------------------------
    CLEAN SHUTDOWN
