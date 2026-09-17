@@ -455,7 +455,6 @@ function renderUserInformation(user) {
     }
   });
 }
-
 /* =========================
    PROFILE MENU
 ========================= */
@@ -463,18 +462,12 @@ function renderUserInformation(user) {
 function openProfileMenu() {
   const menu = $("#accountProfileMenu");
 
-  if (!menu) {
-    console.warn("Profile menu #accountProfileMenu not found.");
-    return;
-  }
+  if (!menu) return;
 
   menu.style.display = "block";
   menu.classList.add("open");
 
-  const profileButton =
-    $("#accountProfileButton") ||
-    $("#profileButton") ||
-    document.querySelector("[data-profile-menu]");
+  const profileButton = $("#accountProfileTrigger");
 
   if (profileButton) {
     profileButton.setAttribute("aria-expanded", "true");
@@ -489,10 +482,7 @@ function closeProfileMenu() {
     menu.classList.remove("open");
   }
 
-  const profileButton =
-    $("#accountProfileButton") ||
-    $("#profileButton") ||
-    document.querySelector("[data-profile-menu]");
+  const profileButton = $("#accountProfileTrigger");
 
   if (profileButton) {
     profileButton.setAttribute("aria-expanded", "false");
@@ -510,8 +500,8 @@ function toggleProfileMenu(event) {
   if (!menu) return;
 
   const isOpen =
-    menu.classList.contains("open") ||
-    menu.style.display === "block";
+    menu.style.display === "block" ||
+    menu.classList.contains("open");
 
   if (isOpen) {
     closeProfileMenu();
@@ -525,80 +515,13 @@ function bindProfileMenu() {
   const mobileProfileButton = $("#mobileProfileButton");
 
   if (profileButton) {
-    profileButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleProfileMenu();
-    });
-
+    profileButton.addEventListener("click", toggleProfileMenu);
     profileButton.setAttribute("aria-expanded", "false");
   }
 
   if (mobileProfileButton) {
-    mobileProfileButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleProfileMenu();
-    });
+    mobileProfileButton.addEventListener("click", toggleProfileMenu);
   }
-
-  document.addEventListener("click", (event) => {
-    const menu = $("#accountProfileMenu");
-
-    if (!menu || menu.style.display !== "block") {
-      return;
-    }
-
-    const clickedProfileButton =
-      profileButton &&
-      (profileButton === event.target ||
-        profileButton.contains(event.target));
-
-    const clickedMobileButton =
-      mobileProfileButton &&
-      (mobileProfileButton === event.target ||
-        mobileProfileButton.contains(event.target));
-
-    const clickedInsideMenu =
-      menu.contains(event.target);
-
-    if (
-      !clickedInsideMenu &&
-      !clickedProfileButton &&
-      !clickedMobileButton
-    ) {
-      closeProfileMenu();
-    }
-  });
-}
-  /*
-    Support the profile button regardless of which selector
-    the HTML currently uses.
-  */
-
-  const profileButtons = [];
-
-  [
-    "#accountProfileButton",
-    "#profileButton",
-    "#accountProfile",
-    "[data-profile-menu]"
-  ].forEach((selector) => {
-    $$(selector).forEach((button) => {
-      if (!profileButtons.includes(button)) {
-        profileButtons.push(button);
-      }
-    });
-  });
-
-  profileButtons.forEach((button) => {
-    button.addEventListener("click", toggleProfileMenu);
-    button.setAttribute("aria-expanded", "false");
-  });
-
-  /*
-    Close the menu when tapping outside it.
-  */
 
   document.addEventListener("click", (event) => {
     const menu = $("#accountProfileMenu");
@@ -609,16 +532,29 @@ function bindProfileMenu() {
 
     const clickedInsideMenu = menu.contains(event.target);
 
-    const clickedProfileButton = profileButtons.some(
-      (button) => button === event.target || button.contains(event.target)
-    );
+    const clickedProfileButton =
+      profileButton &&
+      (
+        profileButton === event.target ||
+        profileButton.contains(event.target)
+      );
 
-    if (!clickedInsideMenu && !clickedProfileButton) {
+    const clickedMobileButton =
+      mobileProfileButton &&
+      (
+        mobileProfileButton === event.target ||
+        mobileProfileButton.contains(event.target)
+      );
+
+    if (
+      !clickedInsideMenu &&
+      !clickedProfileButton &&
+      !clickedMobileButton
+    ) {
       closeProfileMenu();
     }
   });
 }
-
 /* =========================
    LOGOUT
 ========================= */
