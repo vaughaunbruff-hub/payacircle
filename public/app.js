@@ -303,12 +303,17 @@ async function registerUser(event) {
       message.textContent =
         error.message || "Unable to create your account.";
     }
-  } finally {
+    } finally {
     if (submitButton) {
       submitButton.disabled = false;
       submitButton.textContent = "Create Account";
-}
+    }
   }
+}
+
+/* =========================
+   LOGIN
+========================= */
 /* =========================
    LOGIN
 ========================= */
