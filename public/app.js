@@ -307,12 +307,8 @@ async function registerUser(event) {
     if (submitButton) {
       submitButton.disabled = false;
       submitButton.textContent = "Create Account";
-    }
-  }
 }
   }
-}
-
 /* =========================
    LOGIN
 ========================= */
