@@ -659,31 +659,39 @@ function bindAccountNavigation() {
 ========================= */
 
 function renderMemberships(user) {
-  const container =
-    $("#membershipsList") ||
-    $("#accountMemberships") ||
-    $("#circleMemberships");
+  const dashboardContainer =
+    $("#dashboardCircles");
 
-  if (!container) return;
+  const circlesPageContainer =
+    $("#circlesPageGrid");
 
   const memberships = Array.isArray(user.memberships)
     ? user.memberships
     : [];
 
   if (!memberships.length) {
-    container.innerHTML = `
+    const emptyHTML = `
       <div class="empty-state">
-        <h3>No memberships yet</h3>
-        <p>Join a PayaCircle to see your membership here.</p>
+        <h3>No circles yet</h3>
+        <p>Create or join a PayaCircle to see it here.</p>
       </div>
     `;
+
+    if (dashboardContainer) {
+      dashboardContainer.innerHTML = emptyHTML;
+    }
+
+    if (circlesPageContainer) {
+      circlesPageContainer.innerHTML = emptyHTML;
+    }
 
     return;
   }
 
-  container.innerHTML = memberships
+  const circlesHTML = memberships
     .map((membership) => {
-      const circle = membership.circle || {};
+      const circle =
+        membership.circle || {};
 
       const name =
         circle.name ||
@@ -698,7 +706,9 @@ function renderMemberships(user) {
         membership.contribution ||
         membership.amount ||
         circle.contribution ||
-        0;
+        (circle.amountCents
+          ? circle.amountCents / 100
+          : 0);
 
       const canCancel =
         circle.status === "COLLECTING" &&
@@ -708,6 +718,7 @@ function renderMemberships(user) {
       return `
         <div class="membership-card">
           <div class="membership-card-main">
+
             <h3>${escapeHTML(name)}</h3>
 
             <p>
@@ -721,6 +732,7 @@ function renderMemberships(user) {
             </p>
 
             <div class="membership-actions">
+
               ${
                 circle.id
                   ? `
@@ -748,28 +760,53 @@ function renderMemberships(user) {
                   `
                   : ""
               }
+
             </div>
+
           </div>
         </div>
       `;
     })
     .join("");
 
-  $$(".view-circle-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      const circleId = button.dataset.circleId;
+  if (dashboardContainer) {
+    dashboardContainer.innerHTML =
+      circlesHTML;
+  }
 
-      if (circleId) {
-        openCircleDetails(circleId);
-      }
-    });
-  });
+  if (circlesPageContainer) {
+    circlesPageContainer.innerHTML =
+      circlesHTML;
+  }
 
-  $$(".cancel-membership-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      confirmCancellation(button.dataset.membershipId);
-    });
-  });
+  $$(".view-circle-button").forEach(
+    (button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          const circleId =
+            button.dataset.circleId;
+
+          if (circleId) {
+            openCircleDetails(circleId);
+          }
+        }
+      );
+    }
+  );
+
+  $$(".cancel-membership-button").forEach(
+    (button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          confirmCancellation(
+            button.dataset.membershipId
+          );
+        }
+      );
+    }
+  );
 }
 
 /* =========================
