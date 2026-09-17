@@ -1226,61 +1226,102 @@ function closeCircleModal() {
 /* =========================
    CIRCLE FORM
 ========================= */
+/* =========================
+   CIRCLE FORM
+========================= */
 
 async function submitCircleMembership(event) {
   event.preventDefault();
 
   const form = event.currentTarget;
 
-  const circleId =
-    form.querySelector('[name="circleId"]')?.value ||
-    selectedCircle?.id;
-
-  if (!circleId) {
-    alert("Circle could not be identified.");
-    return;
-  }
-
   const button =
     form.querySelector('button[type="submit"]');
 
+  const message =
+    $("#circleMessage");
+
+  const name =
+    $("#circleName")?.value.trim() || "";
+
+  const type =
+    $("#circleType")?.value;
+
+  const amountUsd =
+    Number($("#circleAmount")?.value);
+
+  const capacity =
+    Number($("#circleCapacity")?.value);
+
+  if (!type || !amountUsd || !capacity) {
+    if (message) {
+      message.textContent =
+        "Please complete all required circle information.";
+    }
+    return;
+  }
+
   if (button) {
     button.disabled = true;
-    button.textContent = "Joining...";
+    button.textContent = "Creating...";
+  }
+
+  if (message) {
+    message.textContent = "";
   }
 
   try {
     const data = await api(
-      `/circles/${encodeURIComponent(circleId)}/join`,
+      "/circles",
       {
-        method: "POST"
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          type,
+          capacity,
+          amountUsd
+        })
       }
     );
 
+    if (message) {
+      message.textContent =
+        "Circle created successfully!";
+    }
+
     alert(
-      data.message ||
-      "Membership created successfully."
+      `Circle "${data.name || "Circle"}" created successfully.`
     );
 
     closeCircleModal();
 
     await loadAccount();
+
   } catch (error) {
+    if (message) {
+      message.textContent =
+        error.message ||
+        "Unable to create circle.";
+    }
+
     alert(
       error.message ||
-      "Unable to join this circle."
+      "Unable to create circle."
     );
+
   } finally {
     if (button) {
       button.disabled = false;
-      button.textContent = "Join Circle";
+      button.textContent = "Create Circle";
     }
   }
 }
 
+
 /* =========================
    MODALS
 ========================= */
+
 function bindModalButtons() {
   const closeCircle =
     $("#closeCircleModal");
@@ -1334,7 +1375,8 @@ function bindModalButtons() {
     );
   }
 
-  const circleForm = $("#circleForm");
+  const circleForm =
+    $("#circleForm");
 
   if (circleForm) {
     circleForm.addEventListener(
@@ -1343,6 +1385,7 @@ function bindModalButtons() {
     );
   }
 }
+
 
 /* =========================
    PUBLIC NAVIGATION
