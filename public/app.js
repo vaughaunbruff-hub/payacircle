@@ -1,10 +1,20 @@
 const API = "/api";
 
 let currentUser = null;
-let currentCircle = null;
+let selectedCircle = null;
+let selectedMembership = null;
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+/* =========================
+   BASIC HELPERS
+========================= */
+
+function $(selector) {
+  return document.querySelector(selector);
+}
+
+function $$(selector) {
+  return Array.from(document.querySelectorAll(selector));
+}
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -15,8 +25,13 @@ function escapeHTML(value) {
     .replace(/'/g, "&#039;");
 }
 
-function money(cents) {
-  return `$${((Number(cents) || 0) / 100).toFixed(2)}`;
+function money(value) {
+  const amount = Number(value || 0);
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD"
+  }).format(amount);
 }
 
 function formatDate(value) {
@@ -24,12 +39,14 @@ function formatDate(value) {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
 
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
+  return date.toLocaleDateString("en-US", {
     month: "short",
-    day: "numeric"
+    day: "numeric",
+    year: "numeric"
   });
 }
 
@@ -38,22 +55,29 @@ function formatDateTime(value) {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
 
-  return date.toLocaleString(undefined, {
-    year: "numeric",
+  return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
+    year: "numeric",
     hour: "numeric",
     minute: "2-digit"
   });
 }
+
+/* =========================
+   API
+========================= */
 
 async function api(path, options = {}) {
   const fetchOptions = {
     credentials: "include",
     ...options,
     headers: {
+      Accept: "application/json",
       "Content-Type": "application/json",
       ...(options.headers || {})
     }
@@ -80,246 +104,143 @@ async function api(path, options = {}) {
   return data;
 }
 
-function show(element) {
-  if (!element) return;
+/* =========================
+   VISIBILITY
+========================= */
 
-  element.hidden = false;
-  element.style.display = "";
-  element.classList.remove("hidden");
+function show(element) {
+  if (element) {
+    element.style.display = "";
+  }
 }
 
 function hide(element) {
-  if (!element) return;
-
-  element.hidden = true;
-  element.style.display = "none";
+  if (element) {
+    element.style.display = "none";
+  }
 }
 
-/* =========================================================
-   PUBLIC / ACCOUNT DISPLAY
-========================================================= */
-
 function showPublicSite() {
-  const publicSite = $("#publicSite");
-  const dashboard = $("#dashboard");
-
-  show(publicSite);
-  hide(dashboard);
+  hide($("#dashboard"));
+  show($("#publicSite"));
+  closeProfileMenu();
 }
 
 function showAccountDashboard() {
-  const publicSite = $("#publicSite");
-  const dashboard = $("#dashboard");
-
-  hide(publicSite);
-  show(dashboard);
+  hide($("#publicSite"));
+  show($("#dashboard"));
 }
 
-/* =========================================================
+/* =========================
    AUTH MODAL
-========================================================= */
+========================= */
 
-function switchAuthMode(mode) {
-  const loginForm = $("#loginForm");
-  const registerForm = $("#registerForm");
-
-  const loginTab = $("#loginTab");
-  const registerTab = $("#registerTab");
-
-  const title = $("#authModalTitle");
-
-  const loginMessage = $("#loginMessage");
-  const registerMessage = $("#registerMessage");
-
-  const normalizedMode =
-    String(mode).toLowerCase() === "register"
-      ? "register"
-      : "login";
-
-  if (normalizedMode === "login") {
-    if (loginForm) {
-      loginForm.style.display = "";
-      loginForm.hidden = false;
-    }
-
-    if (registerForm) {
-      registerForm.style.display = "none";
-      registerForm.hidden = true;
-    }
-
-    if (loginTab) {
-      loginTab.classList.add("active");
-      loginTab.setAttribute("aria-selected", "true");
-    }
-
-    if (registerTab) {
-      registerTab.classList.remove("active");
-      registerTab.setAttribute("aria-selected", "false");
-    }
-
-    if (title) {
-      title.textContent = "Sign in to your account";
-    }
-
-    if (loginMessage) {
-      loginMessage.textContent = "";
-    }
-  } else {
-    if (registerForm) {
-      registerForm.style.display = "";
-      registerForm.hidden = false;
-    }
-
-    if (loginForm) {
-      loginForm.style.display = "none";
-      loginForm.hidden = true;
-    }
-
-    if (registerTab) {
-      registerTab.classList.add("active");
-      registerTab.setAttribute("aria-selected", "true");
-    }
-
-    if (loginTab) {
-      loginTab.classList.remove("active");
-      loginTab.setAttribute("aria-selected", "false");
-    }
-
-    if (title) {
-      title.textContent = "Create your account";
-    }
-
-    if (registerMessage) {
-      registerMessage.textContent = "";
-    }
-  }
-}
-
-function openAuthModal(mode = "login") {
+function openAuthModal(mode = "register") {
   const modal = $("#authModal");
 
-  if (!modal) {
-    console.error("PayaCircle: authModal was not found.");
-    return;
-  }
+  if (!modal) return;
 
   show(modal);
   switchAuthMode(mode);
 }
 
 function closeAuthModal() {
-  const modal = $("#authModal");
-
-  if (modal) {
-    hide(modal);
-  }
+  hide($("#authModal"));
 }
+
+function switchAuthMode(mode) {
+  const registerForm = $("#registerForm");
+  const loginForm = $("#loginForm");
+  const registerTab = $("#registerTab");
+  const loginTab = $("#loginTab");
+  const title = $("#authModalTitle");
+
+  if (mode === "login") {
+    hide(registerForm);
+    show(loginForm);
+
+    if (registerTab) registerTab.classList.remove("active");
+    if (loginTab) loginTab.classList.add("active");
+
+    if (title) {
+      title.textContent = "Sign in to PayaCircle";
+    }
+  } else {
+    show(registerForm);
+    hide(loginForm);
+
+    if (registerTab) registerTab.classList.add("active");
+    if (loginTab) loginTab.classList.remove("active");
+
+    if (title) {
+      title.textContent = "Create your PayaCircle account";
+    }
+  }
+
+  const registerMessage = $("#registerMessage");
+  const loginMessage = $("#loginMessage");
+
+  if (registerMessage) registerMessage.textContent = "";
+  if (loginMessage) loginMessage.textContent = "";
+}
+
+/* =========================
+   AUTH BUTTONS
+========================= */
 
 function bindAuthButtons() {
-  const signInButtons = [
-    "#headerSignIn",
-    "#heroSignIn",
-    "#footerSignIn"
+  const buttons = [
+    ["#headerSignIn", "login"],
+    ["#headerGetStarted", "register"],
+    ["#heroGetStarted", "register"],
+    ["#heroSignIn", "login"],
+    ["#promoGetStarted", "register"],
+    ["#finalGetStarted", "register"],
+    ["#footerSignIn", "login"]
   ];
 
-  const registerButtons = [
-    "#headerGetStarted",
-    "#heroGetStarted",
-    "#promoGetStarted",
-    "#finalGetStarted"
-  ];
-
-  signInButtons.forEach((selector) => {
+  buttons.forEach(([selector, mode]) => {
     const button = $(selector);
 
     if (!button) return;
 
-    button.type = "button";
-
     button.addEventListener("click", (event) => {
       event.preventDefault();
-      event.stopPropagation();
-      openAuthModal("login");
+      openAuthModal(mode);
     });
   });
 
-  registerButtons.forEach((selector) => {
-    const button = $(selector);
-
-    if (!button) return;
-
-    button.type = "button";
-
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openAuthModal("register");
-    });
-  });
-}
-
-function bindAuthModal() {
-  const loginTab = $("#loginTab");
   const registerTab = $("#registerTab");
-  const closeButton = $("#closeAuthModal");
-
-  if (loginTab) {
-    loginTab.type = "button";
-
-    loginTab.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      switchAuthMode("login");
-    });
-  }
 
   if (registerTab) {
-    registerTab.type = "button";
-
     registerTab.addEventListener("click", (event) => {
       event.preventDefault();
-      event.stopPropagation();
       switchAuthMode("register");
     });
   }
 
-  if (closeButton) {
-    closeButton.type = "button";
+  const loginTab = $("#loginTab");
 
+  if (loginTab) {
+    loginTab.addEventListener("click", (event) => {
+      event.preventDefault();
+      switchAuthMode("login");
+    });
+  }
+
+  const closeButton = $("#closeAuthModal");
+
+  if (closeButton) {
     closeButton.addEventListener("click", (event) => {
       event.preventDefault();
       closeAuthModal();
     });
   }
-
-  const modal = $("#authModal");
-
-  if (modal) {
-    modal.addEventListener("click", (event) => {
-      if (event.target === modal) {
-        closeAuthModal();
-      }
-    });
-  }
-
-  $$(".show-login").forEach((element) => {
-    element.addEventListener("click", (event) => {
-      event.preventDefault();
-      switchAuthMode("login");
-    });
-  });
-
-  $$(".show-register").forEach((element) => {
-    element.addEventListener("click", (event) => {
-      event.preventDefault();
-      switchAuthMode("register");
-    });
-  });
 }
 
-/* =========================================================
+/* =========================
    REGISTER
-========================================================= */
+========================= */
 
 async function registerUser(event) {
   event.preventDefault();
@@ -336,25 +257,19 @@ async function registerUser(event) {
     form.querySelector('[name="password"]')?.value || "";
 
   const message = $("#registerMessage");
+  const button = form.querySelector('button[type="submit"]');
 
   if (!name || !email || !password) {
     if (message) {
-      message.textContent =
-        "Please complete all required fields.";
+      message.textContent = "Please complete all fields.";
     }
 
     return;
   }
 
-  const submitButton =
-    form.querySelector('button[type="submit"]');
-
-  const originalText =
-    submitButton?.textContent || "Create Account";
-
-  if (submitButton) {
-    submitButton.disabled = true;
-    submitButton.textContent = "Creating account...";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Creating account...";
   }
 
   try {
@@ -371,12 +286,12 @@ async function registerUser(event) {
 
     if (message) {
       message.textContent =
-        "Account created successfully.";
+        data.message || "Account created successfully.";
     }
 
-    setTimeout(async () => {
+    setTimeout(() => {
       closeAuthModal();
-      await loadAccount();
+      loadAccount();
     }, 500);
   } catch (error) {
     if (message) {
@@ -384,16 +299,16 @@ async function registerUser(event) {
         error.message || "Unable to create account.";
     }
   } finally {
-    if (submitButton) {
-      submitButton.disabled = false;
-      submitButton.textContent = originalText;
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Create Account";
     }
   }
 }
 
-/* =========================================================
+/* =========================
    LOGIN
-========================================================= */
+========================= */
 
 async function loginUser(event) {
   event.preventDefault();
@@ -407,6 +322,7 @@ async function loginUser(event) {
     form.querySelector('[name="password"]')?.value || "";
 
   const message = $("#loginMessage");
+  const button = form.querySelector('button[type="submit"]');
 
   if (!email || !password) {
     if (message) {
@@ -417,15 +333,9 @@ async function loginUser(event) {
     return;
   }
 
-  const submitButton =
-    form.querySelector('button[type="submit"]');
-
-  const originalText =
-    submitButton?.textContent || "Sign In";
-
-  if (submitButton) {
-    submitButton.disabled = true;
-    submitButton.textContent = "Signing in...";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Signing in...";
   }
 
   try {
@@ -439,6 +349,11 @@ async function loginUser(event) {
 
     currentUser = data.user || data;
 
+    if (message) {
+      message.textContent =
+        data.message || "Signed in successfully.";
+    }
+
     closeAuthModal();
 
     await loadAccount();
@@ -448,30 +363,16 @@ async function loginUser(event) {
         error.message || "Unable to sign in.";
     }
   } finally {
-    if (submitButton) {
-      submitButton.disabled = false;
-      submitButton.textContent = originalText;
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Sign In";
     }
   }
 }
 
-function bindForms() {
-  const loginForm = $("#loginForm");
-
-  if (loginForm) {
-    loginForm.addEventListener("submit", loginUser);
-  }
-
-  const registerForm = $("#registerForm");
-
-  if (registerForm) {
-    registerForm.addEventListener("submit", registerUser);
-  }
-}
-
-/* =========================================================
-   CURRENT USER / ACCOUNT
-========================================================= */
+/* =========================
+   CURRENT USER
+========================= */
 
 async function getCurrentUser() {
   try {
@@ -482,6 +383,10 @@ async function getCurrentUser() {
     return null;
   }
 }
+
+/* =========================
+   ACCOUNT
+========================= */
 
 async function loadAccount() {
   try {
@@ -508,19 +413,23 @@ async function loadAccount() {
 
     activateAccountPanel("overview");
   } catch (error) {
-    console.error(
-      "PayaCircle account error:",
-      error
-    );
-
+    console.error("Account loading error:", error);
     showPublicSite();
   }
 }
 
 function renderUserInformation(user) {
+  const name =
+    user.name ||
+    user.fullName ||
+    user.firstName ||
+    "Member";
+
+  const email =
+    user.email ||
+    "";
+
   const nameElements = [
-    "#accountUserName",
-    "#profileUserName",
     "#dashboardUserName",
     "#profileMenuName"
   ];
@@ -529,14 +438,11 @@ function renderUserInformation(user) {
     const element = $(selector);
 
     if (element) {
-      element.textContent =
-        user?.name || "Member";
+      element.textContent = name;
     }
   });
 
   const emailElements = [
-    "#accountUserEmail",
-    "#profileUserEmail",
     "#dashboardUserEmail",
     "#profileMenuEmail"
   ];
@@ -545,61 +451,239 @@ function renderUserInformation(user) {
     const element = $(selector);
 
     if (element) {
-      element.textContent =
-        user?.email || "";
+      element.textContent = email;
     }
   });
 }
 
-function renderAccountBalance(user) {
-  const element = $("#accountBalance");
+/* =========================
+   PROFILE MENU
+========================= */
 
-  if (!element) return;
+function openProfileMenu() {
+  const menu = $("#accountProfileMenu");
 
-  const memberships =
-    Array.isArray(user?.memberships)
-      ? user.memberships
-      : [];
+  if (!menu) {
+    console.warn("Profile menu #accountProfileMenu not found.");
+    return;
+  }
 
-  const activeMemberships =
-    memberships.filter(
-      (membership) =>
-        membership.status !== "CANCELLED" &&
-        membership.status !== "REFUNDED"
-    );
+  menu.style.display = "block";
+  menu.classList.add("open");
 
-  const total =
-    activeMemberships.reduce(
-      (sum, membership) =>
-        sum +
-        Number(
-          membership.circle?.amountCents || 0
-        ),
-      0
-    );
+  const profileButton =
+    $("#accountProfileButton") ||
+    $("#profileButton") ||
+    document.querySelector("[data-profile-menu]");
 
-  element.textContent = money(total);
+  if (profileButton) {
+    profileButton.setAttribute("aria-expanded", "true");
+  }
 }
 
-/* =========================================================
+function closeProfileMenu() {
+  const menu = $("#accountProfileMenu");
+
+  if (menu) {
+    menu.style.display = "none";
+    menu.classList.remove("open");
+  }
+
+  const profileButton =
+    $("#accountProfileButton") ||
+    $("#profileButton") ||
+    document.querySelector("[data-profile-menu]");
+
+  if (profileButton) {
+    profileButton.setAttribute("aria-expanded", "false");
+  }
+}
+
+function toggleProfileMenu(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  const menu = $("#accountProfileMenu");
+
+  if (!menu) return;
+
+  const isOpen =
+    menu.classList.contains("open") ||
+    menu.style.display === "block";
+
+  if (isOpen) {
+    closeProfileMenu();
+  } else {
+    openProfileMenu();
+  }
+}
+
+function bindProfileMenu() {
+  /*
+    Support the profile button regardless of which selector
+    the HTML currently uses.
+  */
+
+  const profileButtons = [];
+
+  [
+    "#accountProfileButton",
+    "#profileButton",
+    "#accountProfile",
+    "[data-profile-menu]"
+  ].forEach((selector) => {
+    $$(selector).forEach((button) => {
+      if (!profileButtons.includes(button)) {
+        profileButtons.push(button);
+      }
+    });
+  });
+
+  profileButtons.forEach((button) => {
+    button.addEventListener("click", toggleProfileMenu);
+    button.setAttribute("aria-expanded", "false");
+  });
+
+  /*
+    Close the menu when tapping outside it.
+  */
+
+  document.addEventListener("click", (event) => {
+    const menu = $("#accountProfileMenu");
+
+    if (!menu || menu.style.display !== "block") {
+      return;
+    }
+
+    const clickedInsideMenu = menu.contains(event.target);
+
+    const clickedProfileButton = profileButtons.some(
+      (button) => button === event.target || button.contains(event.target)
+    );
+
+    if (!clickedInsideMenu && !clickedProfileButton) {
+      closeProfileMenu();
+    }
+  });
+}
+
+/* =========================
+   LOGOUT
+========================= */
+
+async function logoutUser(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  try {
+    await api("/logout", {
+      method: "POST"
+    });
+  } catch (error) {
+    console.warn("Logout request:", error);
+  }
+
+  currentUser = null;
+  selectedCircle = null;
+  selectedMembership = null;
+
+  closeProfileMenu();
+  showPublicSite();
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+
+function bindLogoutButtons() {
+  const logoutButtons = [];
+
+  [
+    "#dashboardLogout",
+    "#profileMenuLogout",
+    "#logoutButton",
+    "[data-logout]"
+  ].forEach((selector) => {
+    $$(selector).forEach((button) => {
+      if (!logoutButtons.includes(button)) {
+        logoutButtons.push(button);
+      }
+    });
+  });
+
+  logoutButtons.forEach((button) => {
+    button.addEventListener("click", logoutUser);
+  });
+}
+
+/* =========================
+   ACCOUNT NAVIGATION
+========================= */
+
+function activateAccountPanel(panelName) {
+  if (!panelName) {
+    panelName = "overview";
+  }
+
+  $$("[data-panel]").forEach((panel) => {
+    if (panel.dataset.panel === panelName) {
+      show(panel);
+    } else {
+      hide(panel);
+    }
+  });
+
+  $$("[data-account-panel]").forEach((button) => {
+    if (button.dataset.accountPanel === panelName) {
+      button.classList.add("active");
+    } else {
+      button.classList.remove("active");
+    }
+  });
+
+  closeProfileMenu();
+}
+
+function bindAccountNavigation() {
+  $$("[data-account-panel]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+
+      const panel =
+        button.dataset.accountPanel ||
+        "overview";
+
+      activateAccountPanel(panel);
+    });
+  });
+}
+
+/* =========================
    MEMBERSHIPS
-========================================================= */
+========================= */
 
 function renderMemberships(user) {
-  const container = $("#accountMemberships");
+  const container =
+    $("#membershipsList") ||
+    $("#accountMemberships") ||
+    $("#circleMemberships");
 
   if (!container) return;
 
-  const memberships =
-    Array.isArray(user?.memberships)
-      ? user.memberships
-      : [];
+  const memberships = Array.isArray(user.memberships)
+    ? user.memberships
+    : [];
 
   if (!memberships.length) {
     container.innerHTML = `
       <div class="empty-state">
-        <strong>No circle memberships yet</strong>
-        <span>Choose a circle to get started.</span>
+        <h3>No memberships yet</h3>
+        <p>Join a PayaCircle to see your membership here.</p>
       </div>
     `;
 
@@ -610,121 +694,105 @@ function renderMemberships(user) {
     .map((membership) => {
       const circle = membership.circle || {};
 
+      const name =
+        circle.name ||
+        circle.code ||
+        "PayaCircle";
+
+      const status =
+        membership.status ||
+        "ACTIVE";
+
+      const contribution =
+        membership.contribution ||
+        membership.amount ||
+        circle.contribution ||
+        0;
+
       const canCancel =
-        membership.status !== "CANCELLED" &&
-        membership.status !== "REFUNDED" &&
-        circle.status === "COLLECTING";
+        circle.status === "COLLECTING" &&
+        status !== "CANCELLED" &&
+        status !== "REFUNDED";
 
       return `
-        <article class="membership-card">
-          <div class="membership-card-header">
-            <div>
-              <h3>
-                ${escapeHTML(
-                  circle.name ||
-                  circle.code ||
-                  "PayaCircle"
-                )}
-              </h3>
+        <div class="membership-card">
+          <div class="membership-card-main">
+            <h3>${escapeHTML(name)}</h3>
 
-              <span class="membership-status">
-                ${escapeHTML(
-                  membership.status ||
-                  "RESERVED"
-                )}
-              </span>
+            <p>
+              Status:
+              <strong>${escapeHTML(status)}</strong>
+            </p>
+
+            <p>
+              Contribution:
+              <strong>${money(contribution)}</strong>
+            </p>
+
+            <div class="membership-actions">
+              ${
+                circle.id
+                  ? `
+                    <button
+                      type="button"
+                      class="view-circle-button"
+                      data-circle-id="${escapeHTML(circle.id)}"
+                    >
+                      View Circle
+                    </button>
+                  `
+                  : ""
+              }
+
+              ${
+                canCancel
+                  ? `
+                    <button
+                      type="button"
+                      class="cancel-membership-button"
+                      data-membership-id="${escapeHTML(membership.id)}"
+                    >
+                      Cancel Membership
+                    </button>
+                  `
+                  : ""
+              }
             </div>
-
-            <strong>
-              ${money(circle.amountCents)}
-            </strong>
           </div>
-
-          <div class="membership-card-details">
-            <div>
-              <span>Circle</span>
-              <strong>
-                ${escapeHTML(
-                  circle.code || "—"
-                )}
-              </strong>
-            </div>
-
-            <div>
-              <span>Payout date</span>
-              <strong>
-                ${formatDate(
-                  membership.payoutDate?.payoutAt
-                )}
-              </strong>
-            </div>
-          </div>
-
-          <div class="membership-card-actions">
-            <button
-              type="button"
-              class="secondary view-circle-button"
-              data-circle-id="${escapeHTML(
-                circle.id || ""
-              )}"
-            >
-              View Circle
-            </button>
-
-            ${
-              canCancel
-                ? `
-                  <button
-                    type="button"
-                    class="danger cancel-membership-button"
-                    data-membership-id="${escapeHTML(
-                      membership.id || ""
-                    )}"
-                  >
-                    Cancel Membership
-                  </button>
-                `
-                : ""
-            }
-          </div>
-        </article>
+        </div>
       `;
     })
     .join("");
 
   $$(".view-circle-button").forEach((button) => {
     button.addEventListener("click", () => {
-      openCircleDetails(
-        button.dataset.circleId
-      );
+      const circleId = button.dataset.circleId;
+
+      if (circleId) {
+        openCircleDetails(circleId);
+      }
     });
   });
 
   $$(".cancel-membership-button").forEach((button) => {
     button.addEventListener("click", () => {
-      confirmCancellation(
-        button.dataset.membershipId
-      );
+      confirmCancellation(button.dataset.membershipId);
     });
   });
 }
 
-/* =========================================================
-   CANCEL MEMBERSHIP
-========================================================= */
+/* =========================
+   CANCELLATION
+========================= */
 
 function confirmCancellation(membershipId) {
   if (!membershipId) return;
 
-  const memberships =
-    Array.isArray(currentUser?.memberships)
-      ? currentUser.memberships
-      : [];
+  const memberships = currentUser?.memberships || [];
 
-  const membership =
-    memberships.find(
-      (item) => item.id === membershipId
-    );
+  const membership = memberships.find(
+    (item) => item.id === membershipId
+  );
 
   if (!membership) {
     alert("Membership could not be found.");
@@ -737,6 +805,7 @@ function confirmCancellation(membershipId) {
     alert(
       "This circle has already started and can no longer be cancelled."
     );
+
     return;
   }
 
@@ -757,17 +826,10 @@ function confirmCancellation(membershipId) {
 async function cancelMembership(membershipId) {
   if (!membershipId) return;
 
-  const button = Array
-    .from(
-      document.querySelectorAll(
-        ".cancel-membership-button"
-      )
-    )
-    .find(
-      (element) =>
-        element.dataset.membershipId ===
-        membershipId
-    );
+  const button = $$(".cancel-membership-button").find(
+    (element) =>
+      element.dataset.membershipId === membershipId
+  );
 
   if (button) {
     button.disabled = true;
@@ -776,9 +838,7 @@ async function cancelMembership(membershipId) {
 
   try {
     const result = await api(
-      `/memberships/${encodeURIComponent(
-        membershipId
-      )}/cancel`,
+      `/memberships/${encodeURIComponent(membershipId)}/cancel`,
       {
         method: "POST"
       }
@@ -798,21 +858,41 @@ async function cancelMembership(membershipId) {
 
     if (button) {
       button.disabled = false;
-      button.textContent =
-        "Cancel Membership";
+      button.textContent = "Cancel Membership";
     }
   }
 }
 
-/* =========================================================
+/* =========================
+   ACCOUNT BALANCE
+========================= */
+
+function renderAccountBalance(user) {
+  const balance =
+    user.balance ??
+    user.accountBalance ??
+    0;
+
+  const elements = [
+    "#accountBalance",
+    "#dashboardBalance",
+    "#availableBalance"
+  ];
+
+  elements.forEach((selector) => {
+    const element = $(selector);
+
+    if (element) {
+      element.textContent = money(balance);
+    }
+  });
+}
+
+/* =========================
    PAYMENTS
-========================================================= */
+========================= */
 
 async function loadPayments() {
-  const container = $("#accountPayments");
-
-  if (!container) return;
-
   try {
     const data = await api("/payments");
 
@@ -820,14 +900,20 @@ async function loadPayments() {
       Array.isArray(data)
         ? data
         : Array.isArray(data.payments)
-        ? data.payments
-        : [];
+          ? data.payments
+          : [];
+
+    const container =
+      $("#paymentsList") ||
+      $("#contributionsList");
+
+    if (!container) return;
 
     if (!payments.length) {
       container.innerHTML = `
         <div class="empty-state">
-          <strong>No payments yet</strong>
-          <span>Your payment history will appear here.</span>
+          <h3>No payments yet</h3>
+          <p>Your contribution payments will appear here.</p>
         </div>
       `;
 
@@ -839,47 +925,36 @@ async function loadPayments() {
         (payment) => `
           <div class="payment-row">
             <div>
-              <strong>
-                ${money(payment.amountCents)}
-              </strong>
-
-              <span>
-                ${escapeHTML(
-                  payment.status || "—"
+              <strong>${money(
+                payment.amount || 0
+              )}</strong>
+              <small>
+                ${formatDateTime(
+                  payment.createdAt ||
+                  payment.created_at
                 )}
-              </span>
+              </small>
             </div>
 
-            <time>
-              ${formatDateTime(
-                payment.createdAt
+            <span>
+              ${escapeHTML(
+                payment.status || "—"
               )}
-            </time>
+            </span>
           </div>
         `
       )
       .join("");
   } catch (error) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <strong>Payments unavailable</strong>
-        <span>
-          ${escapeHTML(error.message)}
-        </span>
-      </div>
-    `;
+    console.warn("Payments unavailable:", error);
   }
 }
 
-/* =========================================================
+/* =========================
    PAYOUTS
-========================================================= */
+========================= */
 
 async function loadPayouts() {
-  const container = $("#accountPayouts");
-
-  if (!container) return;
-
   try {
     const data = await api("/payouts");
 
@@ -887,14 +962,18 @@ async function loadPayouts() {
       Array.isArray(data)
         ? data
         : Array.isArray(data.payouts)
-        ? data.payouts
-        : [];
+          ? data.payouts
+          : [];
+
+    const container = $("#payoutsList");
+
+    if (!container) return;
 
     if (!payouts.length) {
       container.innerHTML = `
         <div class="empty-state">
-          <strong>No payouts yet</strong>
-          <span>Your payout information will appear here.</span>
+          <h3>No payouts yet</h3>
+          <p>Your payout information will appear here.</p>
         </div>
       `;
 
@@ -906,195 +985,39 @@ async function loadPayouts() {
         (payout) => `
           <div class="payout-row">
             <div>
-              <strong>
-                ${money(payout.amountCents)}
-              </strong>
+              <strong>${money(
+                payout.amount || 0
+              )}</strong>
 
-              <span>
-                ${escapeHTML(
-                  payout.status || "—"
+              <small>
+                ${formatDate(
+                  payout.date ||
+                  payout.payoutDate ||
+                  payout.createdAt
                 )}
-              </span>
+              </small>
             </div>
 
-            <time>
-              ${formatDateTime(
-                payout.createdAt
+            <span>
+              ${escapeHTML(
+                payout.status || "—"
               )}
-            </time>
+            </span>
           </div>
         `
       )
       .join("");
   } catch (error) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <strong>Payouts unavailable</strong>
-        <span>
-          ${escapeHTML(error.message)}
-        </span>
-      </div>
-    `;
+    console.warn("Payouts unavailable:", error);
   }
 }
 
-/* =========================================================
-   ACCOUNT NAVIGATION
-========================================================= */
-
-function activateAccountPanel(panelName) {
-  const panels = $$(
-    "[data-account-panel]"
-  );
-
-  panels.forEach((panel) => {
-    const active =
-      panel.dataset.accountPanel ===
-      panelName;
-
-    if (active) {
-      show(panel);
-    } else {
-      hide(panel);
-    }
-  });
-
-  const links = $$(
-    "[data-account-target]"
-  );
-
-  links.forEach((link) => {
-    const active =
-      link.dataset.accountTarget ===
-      panelName;
-
-    link.classList.toggle(
-      "active",
-      active
-    );
-  });
-}
-
-function bindAccountNavigation() {
-  $$("[data-account-target]").forEach(
-    (link) => {
-      link.addEventListener(
-        "click",
-        (event) => {
-          event.preventDefault();
-
-          activateAccountPanel(
-            link.dataset.accountTarget
-          );
-        }
-      );
-    }
-  );
-}
-
-/* =========================================================
-   PROFILE MENU
-========================================================= */
-
-function bindProfileMenu() {
-  const button = $("#profileMenuButton");
-  const menu = $("#profileMenu");
-
-  if (!button || !menu) return;
-
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-
-    menu.classList.toggle("open");
-    menu.hidden = !menu.hidden;
-  });
-
-  document.addEventListener("click", () => {
-    menu.classList.remove("open");
-    menu.hidden = true;
-  });
-}
-
-/* =========================================================
-   LOGOUT
-========================================================= */
-
-async function logoutUser() {
-  try {
-    await api("/logout", {
-      method: "POST"
-    });
-  } catch {
-    // Continue with local logout.
-  }
-
-  currentUser = null;
-  currentCircle = null;
-
-  showPublicSite();
-}
-
-function bindLogoutButtons() {
-  $$("[data-logout]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      async (event) => {
-        event.preventDefault();
-        await logoutUser();
-      }
-    );
-  });
-
-  const logoutButton =
-    $("#logoutButton");
-
-  if (logoutButton) {
-    logoutButton.addEventListener(
-      "click",
-      async (event) => {
-        event.preventDefault();
-        await logoutUser();
-      }
-    );
-  }
-}
-
-/* =========================================================
-   GENERAL MODALS
-========================================================= */
-
-function bindModalButtons() {
-  $$("[data-close-modal]").forEach(
-    (button) => {
-      button.addEventListener("click", () => {
-        const modalId =
-          button.dataset.closeModal;
-
-        const modal = modalId
-          ? $(`#${modalId}`)
-          : button.closest(".modal");
-
-        hide(modal);
-      });
-    }
-  );
-
-  $$(".modal").forEach((modal) => {
-    modal.addEventListener("click", (event) => {
-      if (event.target === modal) {
-        hide(modal);
-      }
-    });
-  });
-}
-
-/* =========================================================
+/* =========================
    PUBLIC CIRCLES
-========================================================= */
+========================= */
 
 async function loadPublicCircles() {
-  const container =
-    $("#publicCircles");
+  const container = $("#publicCircles");
 
   if (!container) return;
 
@@ -1105,14 +1028,14 @@ async function loadPublicCircles() {
       Array.isArray(data)
         ? data
         : Array.isArray(data.circles)
-        ? data.circles
-        : [];
+          ? data.circles
+          : [];
 
     if (!circles.length) {
       container.innerHTML = `
         <div class="empty-state">
-          <strong>No circles available</strong>
-          <span>New circles will appear here.</span>
+          <h3>No circles available</h3>
+          <p>New PayaCircles will appear here when available.</p>
         </div>
       `;
 
@@ -1122,153 +1045,84 @@ async function loadPublicCircles() {
     container.innerHTML = circles
       .map(
         (circle) => `
-          <article class="public-circle-card">
-            <div>
-              <span class="eyebrow">
-                ${escapeHTML(
-                  circle.type || "CUSTOM"
-                )}
-              </span>
+          <div class="circle-card">
+            <h3>${escapeHTML(
+              circle.name ||
+              circle.code ||
+              "PayaCircle"
+            )}</h3>
 
-              <h3>
-                ${escapeHTML(
-                  circle.name ||
-                  circle.code ||
-                  "PayaCircle"
-                )}
-              </h3>
+            <p>
+              ${escapeHTML(
+                circle.type ||
+                "Community"
+              )}
+            </p>
 
-              <p>
-                Contribution:
-                <strong>
-                  ${money(
-                    circle.amountCents
-                  )}
-                </strong>
-              </p>
-
-              <p>
-                Members:
-                ${Number(
-                  circle.memberCount || 0
+            <p>
+              Contribution:
+              <strong>
+                ${money(
+                  circle.contribution ||
+                  circle.amount ||
+                  0
                 )}
-                /
-                ${Number(
-                  circle.capacity || 0
-                )}
-              </p>
-            </div>
+              </strong>
+            </p>
 
             <button
               type="button"
-              class="primary full-width public-circle-button"
-              data-circle-id="${escapeHTML(
-                circle.id || ""
-              )}"
+              class="public-circle-button"
+              data-circle-id="${escapeHTML(circle.id)}"
             >
               View Circle
             </button>
-          </article>
+          </div>
         `
       )
       .join("");
 
-    $$(".public-circle-button").forEach(
-      (button) => {
-        button.addEventListener(
-          "click",
-          () => {
-            openCircleDetails(
-              button.dataset.circleId
-            );
-          }
-        );
-      }
-    );
+    $$(".public-circle-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const circleId = button.dataset.circleId;
+
+        if (circleId) {
+          openCircleDetails(circleId);
+        }
+      });
+    });
   } catch (error) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <strong>Unable to load circles</strong>
-        <span>
-          ${escapeHTML(
-            error.message
-          )}
-        </span>
-      </div>
-    `;
+    console.warn("Public circles unavailable:", error);
   }
 }
 
-/* =========================================================
+/* =========================
    CIRCLE DETAILS
-========================================================= */
+========================= */
 
 async function openCircleDetails(circleId) {
   if (!circleId) return;
 
-  const modal =
-    $("#circleDetailsModal");
-
-  const content =
-    $("#circleDetailsContent");
-
-  if (!modal || !content) return;
-
-  show(modal);
-
-  content.innerHTML = `
-    <div class="loading-state">
-      Loading circle...
-    </div>
-  `;
-
   try {
-    const data = await api(
-      `/circles/${encodeURIComponent(
-        circleId
-      )}`
+    const circle = await api(
+      `/circles/${encodeURIComponent(circleId)}`
     );
 
-    const circle =
-      data.circle || data;
-
-    if (!circle?.id) {
-      throw new Error(
-        "Circle could not be found."
-      );
+    if (!circle || !circle.id) {
+      throw new Error("Circle not found.");
     }
 
-    currentCircle = circle;
+    selectedCircle = circle;
 
-    let dates = [];
+    const modal = $("#circleDetailsModal");
+    const content = $("#circleDetailsContent");
 
-    try {
-      const dateData = await api(
-        `/circles/${encodeURIComponent(
-          circleId
-        )}/dates`
-      );
-
-      dates =
-        Array.isArray(dateData)
-          ? dateData
-          : Array.isArray(
-              dateData.dates
-            )
-          ? dateData.dates
-          : [];
-    } catch {
-      dates = [];
+    if (!modal || !content) {
+      return;
     }
 
     content.innerHTML = `
       <div class="circle-details">
-        <span class="eyebrow">
-          ${escapeHTML(
-            circle.type || "CUSTOM"
-          )}
-        </span>
-
         <h2>
           ${escapeHTML(
             circle.name ||
@@ -1278,258 +1132,302 @@ async function openCircleDetails(circleId) {
         </h2>
 
         <p>
+          Type:
+          ${escapeHTML(
+            circle.type ||
+            "Community"
+          )}
+        </p>
+
+        <p>
           Contribution:
           <strong>
             ${money(
-              circle.amountCents
+              circle.contribution ||
+              circle.amount ||
+              0
             )}
           </strong>
         </p>
 
         <p>
-          Capacity:
-          ${Number(
-            circle.capacity || 0
-          )}
-        </p>
-
-        <p>
           Status:
-          ${escapeHTML(
-            circle.status ||
-            "COLLECTING"
-          )}
+          <strong>
+            ${escapeHTML(
+              circle.status ||
+              "—"
+            )}
+          </strong>
         </p>
-
-        ${
-          dates.length
-            ? `
-              <div class="circle-dates">
-                <h3>
-                  Available payout dates
-                </h3>
-
-                ${dates
-                  .map(
-                    (date) => `
-                      <label class="date-option">
-                        <input
-                          type="radio"
-                          name="payoutDate"
-                          value="${escapeHTML(
-                            date.id || ""
-                          )}"
-                        />
-
-                        <span>
-                          ${formatDate(
-                            date.payoutAt
-                          )}
-                        </span>
-                      </label>
-                    `
-                  )
-                  .join("")}
-              </div>
-            `
-            : `
-              <div class="empty-state">
-                <span>
-                  No payout dates are currently available.
-                </span>
-              </div>
-            `
-        }
 
         <button
           type="button"
-          class="primary full-width"
-          id="reserveCircleButton"
-          data-circle-id="${escapeHTML(
-            circle.id
-          )}"
+          id="joinSelectedCircle"
         >
-          Join Circle
+          Join This Circle
         </button>
       </div>
     `;
 
-    const reserveButton =
-      $("#reserveCircleButton");
+    show(modal);
 
-    if (reserveButton) {
-      reserveButton.addEventListener(
+    const joinButton =
+      $("#joinSelectedCircle");
+
+    if (joinButton) {
+      joinButton.addEventListener(
         "click",
         () => {
-          reserveMembership(
-            reserveButton.dataset.circleId
-          );
+          closeCircleDetails();
+          openCircleForm(circle);
         }
       );
     }
   } catch (error) {
-    content.innerHTML = `
-      <div class="empty-state">
-        <strong>
-          Unable to open circle
-        </strong>
-
-        <span>
-          ${escapeHTML(
-            error.message
-          )}
-        </span>
-      </div>
-    `;
+    alert(
+      error.message ||
+      "Unable to open this circle."
+    );
   }
 }
 
-/* =========================================================
-   RESERVE MEMBERSHIP
-========================================================= */
+function closeCircleDetails() {
+  hide($("#circleDetailsModal"));
+}
 
-async function reserveMembership(circleId) {
-  if (!circleId) return;
+function openCircleForm(circle) {
+  selectedCircle = circle;
 
-  if (!currentUser) {
-    closeModalById(
-      "circleDetailsModal"
-    );
+  const modal = $("#circleModal");
 
-    openAuthModal("login");
+  if (!modal) return;
 
+  show(modal);
+
+  const form = $("#circleForm");
+
+  if (form) {
+    const circleIdInput =
+      form.querySelector('[name="circleId"]');
+
+    if (circleIdInput) {
+      circleIdInput.value =
+        circle.id || "";
+    }
+  }
+}
+
+function closeCircleModal() {
+  hide($("#circleModal"));
+}
+
+/* =========================
+   CIRCLE FORM
+========================= */
+
+async function submitCircleMembership(event) {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+
+  const circleId =
+    form.querySelector('[name="circleId"]')?.value ||
+    selectedCircle?.id;
+
+  if (!circleId) {
+    alert("Circle could not be identified.");
     return;
   }
 
-  const selected =
-    document.querySelector(
-      'input[name="payoutDate"]:checked'
-    );
+  const button =
+    form.querySelector('button[type="submit"]');
 
-  if (!selected) {
-    alert(
-      "Please choose a payout date."
-    );
-
-    return;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Joining...";
   }
 
   try {
-    await api("/memberships", {
-      method: "POST",
-      body: JSON.stringify({
-        circleId,
-        payoutDateId:
-          selected.value
-      })
-    });
+    const data = await api(
+      `/circles/${encodeURIComponent(circleId)}/join`,
+      {
+        method: "POST"
+      }
+    );
 
     alert(
-      "Your circle membership has been reserved."
+      data.message ||
+      "Membership created successfully."
     );
 
-    closeModalById(
-      "circleDetailsModal"
-    );
+    closeCircleModal();
 
     await loadAccount();
   } catch (error) {
     alert(
       error.message ||
-      "Unable to join circle."
+      "Unable to join this circle."
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Join Circle";
+    }
+  }
+}
+
+/* =========================
+   MODALS
+========================= */
+
+function bindModalButtons() {
+  const closeCircle =
+    $("#closeCircleModal");
+
+  if (closeCircle) {
+    closeCircle.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        closeCircleModal();
+      }
+    );
+  }
+
+  const closeCircleDetailsButton =
+    $("#closeCircleDetailsModal");
+
+  if (closeCircleDetailsButton) {
+    closeCircleDetailsButton.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        closeCircleDetails();
+      }
+    );
+  }
+
+  const circleForm = $("#circleForm");
+
+  if (circleForm) {
+    circleForm.addEventListener(
+      "submit",
+      submitCircleMembership
     );
   }
 }
 
-function closeModalById(id) {
-  const modal =
-    id ? $(`#${id}`) : null;
+/* =========================
+   PUBLIC NAVIGATION
+========================= */
 
-  if (modal) {
-    hide(modal);
+function bindPublicNavigation() {
+  $$("[data-scroll-to]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+
+      const target =
+        button.dataset.scrollTo;
+
+      if (!target) return;
+
+      const element =
+        document.querySelector(target);
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth"
+        });
+      }
+    });
+  });
+}
+
+/* =========================
+   FORMS
+========================= */
+
+function bindForms() {
+  const loginForm = $("#loginForm");
+
+  if (loginForm) {
+    loginForm.addEventListener(
+      "submit",
+      loginUser
+    );
+  }
+
+  const registerForm = $("#registerForm");
+
+  if (registerForm) {
+    registerForm.addEventListener(
+      "submit",
+      registerUser
+    );
   }
 }
 
-/* =========================================================
-   PUBLIC NAVIGATION
-========================================================= */
-
-function bindPublicNavigation() {
-  $$("[data-scroll-to]").forEach(
-    (link) => {
-      link.addEventListener(
-        "click",
-        (event) => {
-          event.preventDefault();
-
-          const target =
-            document.getElementById(
-              link.dataset.scrollTo
-            );
-
-          if (target) {
-            target.scrollIntoView({
-              behavior: "smooth",
-              block: "start"
-            });
-          }
-        }
-      );
-    }
-  );
-}
-
-/* =========================================================
-   PAYPAL
-========================================================= */
-
-function bindPayPalButtons() {
-  // PayPal buttons are initialized
-  // when the payment flow is started.
-}
-
-/* =========================================================
+/* =========================
    INITIALIZATION
-========================================================= */
+========================= */
 
 async function initialize() {
   /*
-    Bind all buttons and forms FIRST.
-    Public circle loading must never
-    prevent authentication from working.
+    Bind all buttons FIRST.
+    This prevents public-circle loading
+    or another API request from stopping
+    the profile/sign-in controls.
   */
 
   bindAuthButtons();
-  bindAuthModal();
   bindAccountNavigation();
   bindProfileMenu();
   bindLogoutButtons();
   bindModalButtons();
   bindForms();
   bindPublicNavigation();
-  bindPayPalButtons();
+
+  /*
+    Load public circles without blocking
+    the rest of the application.
+  */
 
   loadPublicCircles().catch((error) => {
-    console.error(
-      "PayaCircle public circles error:",
+    console.warn(
+      "Public circle loading error:",
       error
     );
   });
 
-  const user =
-    await getCurrentUser();
+  /*
+    Check whether the browser already has
+    a valid PayaCircle login session.
+  */
+
+  const user = await getCurrentUser();
 
   if (user) {
     currentUser = user;
-    await loadAccount();
+
+    showAccountDashboard();
+    renderUserInformation(user);
+    renderMemberships(user);
+    renderAccountBalance(user);
+
+    await Promise.allSettled([
+      loadPayments(),
+      loadPayouts()
+    ]);
+
+    activateAccountPanel("overview");
   } else {
     showPublicSite();
   }
 }
 
-/* =========================================================
-   START APP
-========================================================= */
+/* =========================
+   START
+========================= */
 
 document.addEventListener(
   "DOMContentLoaded",
