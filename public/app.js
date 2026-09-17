@@ -131,6 +131,80 @@ function closeAuthModal() {
 }
 
 function switchAuthMode(mode) {
+  const loginForm = $("#loginForm");
+  const registerForm = $("#registerForm");
+
+  const loginTab = $("#loginTab");
+  const registerTab = $("#registerTab");
+
+  const title = $("#authModalTitle");
+
+  const loginMessage = $("#loginMessage");
+  const registerMessage = $("#registerMessage");
+
+  const normalizedMode =
+    String(mode).toLowerCase() === "register"
+      ? "register"
+      : "login";
+
+  if (normalizedMode === "login") {
+    if (loginForm) {
+      loginForm.style.display = "";
+      loginForm.hidden = false;
+    }
+
+    if (registerForm) {
+      registerForm.style.display = "none";
+      registerForm.hidden = true;
+    }
+
+    if (loginTab) {
+      loginTab.classList.add("active");
+      loginTab.setAttribute("aria-selected", "true");
+    }
+
+    if (registerTab) {
+      registerTab.classList.remove("active");
+      registerTab.setAttribute("aria-selected", "false");
+    }
+
+    if (title) {
+      title.textContent = "Sign in to your account";
+    }
+
+    if (loginMessage) {
+      loginMessage.textContent = "";
+    }
+  } else {
+    if (registerForm) {
+      registerForm.style.display = "";
+      registerForm.hidden = false;
+    }
+
+    if (loginForm) {
+      loginForm.style.display = "none";
+      loginForm.hidden = true;
+    }
+
+    if (registerTab) {
+      registerTab.classList.add("active");
+      registerTab.setAttribute("aria-selected", "true");
+    }
+
+    if (loginTab) {
+      loginTab.classList.remove("active");
+      loginTab.setAttribute("aria-selected", "false");
+    }
+
+    if (title) {
+      title.textContent = "Create your account";
+    }
+
+    if (registerMessage) {
+      registerMessage.textContent = "";
+    }
+  }
+}
   const loginPanel = $("#loginPanel");
   const registerPanel = $("#registerPanel");
 
