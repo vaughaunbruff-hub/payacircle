@@ -7,11 +7,8 @@ let currentCircle = null;
    HELPERS
 --------------------------------- */
 
-const $ = (selector) =>
-  document.querySelector(selector);
-
-const $$ = (selector) =>
-  Array.from(document.querySelectorAll(selector));
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -23,9 +20,7 @@ function escapeHTML(value) {
 }
 
 function money(cents) {
-  return `$${(
-    Number(cents || 0) / 100
-  ).toFixed(2)}`;
+  return `$${(Number(cents || 0) / 100).toFixed(2)}`;
 }
 
 function formatDate(value) {
@@ -76,10 +71,7 @@ async function api(path, options = {}) {
     }
   };
 
-  const response = await fetch(
-    `${API}${path}`,
-    fetchOptions
-  );
+  const response = await fetch(`${API}${path}`, fetchOptions);
 
   let data = {};
 
@@ -257,8 +249,7 @@ async function registerUser(event) {
 
   if (!name || !email || !password) {
     if (message) {
-      message.textContent =
-        "Please complete all fields.";
+      message.textContent = "Please complete all fields.";
     }
 
     return;
@@ -282,8 +273,7 @@ async function registerUser(event) {
   } catch (error) {
     if (message) {
       message.textContent =
-        error.message ||
-        "Unable to create account.";
+        error.message || "Unable to create account.";
     }
   }
 }
@@ -304,6 +294,9 @@ async function loginUser(event) {
     form.querySelector('[name="password"]')?.value || "";
 
   const message = $("#loginMessage");
+  const submitButton = form.querySelector(
+    'button[type="submit"], input[type="submit"]'
+  );
 
   if (!email || !password) {
     if (message) {
@@ -312,6 +305,13 @@ async function loginUser(event) {
     }
 
     return;
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.dataset.originalText =
+      submitButton.textContent || "";
+    submitButton.textContent = "Signing in...";
   }
 
   try {
@@ -331,8 +331,14 @@ async function loginUser(event) {
   } catch (error) {
     if (message) {
       message.textContent =
-        error.message ||
-        "Unable to sign in.";
+        error.message || "Unable to sign in.";
+    }
+
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent =
+        submitButton.dataset.originalText ||
+        "Sign In";
     }
   }
 }
@@ -419,8 +425,10 @@ async function loadAccount() {
   renderMemberships(user);
   renderAccountBalance(user);
 
-  await loadPayments();
-  await loadPayouts();
+  await Promise.allSettled([
+    loadPayments(),
+    loadPayouts()
+  ]);
 
   activateAccountPanel("overview");
 }
@@ -444,29 +452,25 @@ function renderUserInformation(user) {
 --------------------------------- */
 
 function renderAccountBalance(user) {
-  const memberships = user.memberships || [];
+  const memberships = Array.isArray(user.memberships)
+    ? user.memberships
+    : [];
 
   const paid = memberships.filter((membership) =>
-    [
-      "PAID",
-      "PAYOUT_SCHEDULED"
-    ].includes(membership.status)
+    ["PAID", "PAYOUT_SCHEDULED"].includes(
+      membership.status
+    )
   );
 
   const total = paid.reduce(
     (sum, membership) =>
-      sum +
-      Number(
-        membership.circle?.amountCents || 0
-      ),
+      sum + Number(membership.circle?.amountCents || 0),
     0
   );
 
-  $$("[data-account-balance]").forEach(
-    (element) => {
-      element.textContent = money(total);
-    }
-  );
+  $$("[data-account-balance]").forEach((element) => {
+    element.textContent = money(total);
+  });
 }
 
 /* --------------------------------
@@ -478,7 +482,9 @@ function renderMemberships(user) {
 
   if (!container) return;
 
-  const memberships = user.memberships || [];
+  const memberships = Array.isArray(user.memberships)
+    ? user.memberships
+    : [];
 
   if (!memberships.length) {
     container.innerHTML = `
@@ -515,9 +521,7 @@ function renderMemberships(user) {
           <div class="account-circle-main">
             <div>
               <span class="eyebrow">
-                ${escapeHTML(
-                  circle.type || "Circle"
-                )}
+                ${escapeHTML(circle.type || "Circle")}
               </span>
 
               <h3>
@@ -531,9 +535,7 @@ function renderMemberships(user) {
               <p>
                 Contribution:
                 <strong>
-                  ${money(
-                    circle.amountCents
-                  )}
+                  ${money(circle.amountCents)}
                 </strong>
               </p>
 
@@ -542,9 +544,7 @@ function renderMemberships(user) {
                 <strong>
                   ${
                     payoutDate
-                      ? formatDate(
-                          payoutDate.payoutAt
-                        )
+                      ? formatDate(payoutDate.payoutAt)
                       : "Not selected"
                   }
                 </strong>
@@ -553,22 +553,16 @@ function renderMemberships(user) {
 
             <div class="account-circle-status">
               <span class="status-badge status-${escapeHTML(
-                String(
-                  membership.status || ""
-                ).toLowerCase()
+                String(membership.status || "").toLowerCase()
               )}">
                 ${escapeHTML(
-                  prettyStatus(
-                    membership.status
-                  )
+                  prettyStatus(membership.status)
                 )}
               </span>
 
               <span class="status-badge">
                 ${escapeHTML(
-                  prettyStatus(
-                    circle.status
-                  )
+                  prettyStatus(circle.status)
                 )}
               </span>
             </div>
@@ -608,21 +602,17 @@ function renderMemberships(user) {
 
   $$(".circle-view-button").forEach((button) => {
     button.addEventListener("click", () => {
-      openCircleDetails(
-        button.dataset.circleId
-      );
+      openCircleDetails(button.dataset.circleId);
     });
   });
 
-  $$(".cancel-membership-button").forEach(
-    (button) => {
-      button.addEventListener("click", () => {
-        confirmCancellation(
-          button.dataset.membershipId
-        );
-      });
-    }
-  );
+  $$(".cancel-membership-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      confirmCancellation(
+        button.dataset.membershipId
+      );
+    });
+  });
 }
 
 /* --------------------------------
@@ -635,9 +625,7 @@ function prettyStatus(value) {
   return String(value)
     .toLowerCase()
     .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase()
-    );
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 /* --------------------------------
@@ -665,7 +653,6 @@ function confirmCancellation(membershipId) {
     alert(
       "This circle has already started and can no longer be cancelled."
     );
-
     return;
   }
 
@@ -692,8 +679,7 @@ async function cancelMembership(membershipId) {
     )
   ).find(
     (element) =>
-      element.dataset.membershipId ===
-      membershipId
+      element.dataset.membershipId === membershipId
   );
 
   if (button) {
@@ -734,8 +720,7 @@ async function cancelMembership(membershipId) {
 
     if (button) {
       button.disabled = false;
-      button.textContent =
-        "Cancel Membership";
+      button.textContent = "Cancel Membership";
     }
   }
 }
@@ -759,7 +744,6 @@ async function loadPublicCircles() {
           <span>New savings circles will appear here.</span>
         </div>
       `;
-
       return;
     }
 
@@ -768,9 +752,7 @@ async function loadPublicCircles() {
         (circle) => `
           <article class="public-circle-card">
             <span class="eyebrow">
-              ${escapeHTML(
-                circle.type || "CUSTOM"
-              )}
+              ${escapeHTML(circle.type || "CUSTOM")}
             </span>
 
             <h3>
@@ -784,9 +766,7 @@ async function loadPublicCircles() {
             <p>
               Contribution:
               <strong>
-                ${money(
-                  circle.amountCents
-                )}
+                ${money(circle.amountCents)}
               </strong>
             </p>
 
@@ -794,8 +774,7 @@ async function loadPublicCircles() {
               Members:
               <strong>
                 ${
-                  circle._count?.memberships ||
-                  0
+                  circle._count?.memberships || 0
                 } / ${circle.capacity}
               </strong>
             </p>
@@ -814,23 +793,19 @@ async function loadPublicCircles() {
       )
       .join("");
 
-    $$(".public-circle-button").forEach(
-      (button) => {
-        button.addEventListener("click", () => {
-          openCircleDetails(
-            button.dataset.circleId
-          );
-        });
-      }
-    );
+    $$(".public-circle-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        openCircleDetails(
+          button.dataset.circleId
+        );
+      });
+    });
   } catch (error) {
     container.innerHTML = `
       <div class="empty-state">
         <strong>Unable to load circles</strong>
         <span>
-          ${escapeHTML(
-            error.message
-          )}
+          ${escapeHTML(error.message)}
         </span>
       </div>
     `;
@@ -859,17 +834,13 @@ async function openCircleDetails(circleId) {
 
   try {
     const data = await api(
-      `/circles/${encodeURIComponent(
-        circleId
-      )}`
+      `/circles/${encodeURIComponent(circleId)}`
     );
 
     const circle = data.circle || data;
 
     if (!circle || !circle.id) {
-      throw new Error(
-        "Circle could not be found."
-      );
+      throw new Error("Circle could not be found.");
     }
 
     currentCircle = circle;
@@ -878,9 +849,7 @@ async function openCircleDetails(circleId) {
 
     try {
       const dateData = await api(
-        `/circles/${encodeURIComponent(
-          circleId
-        )}/dates`
+        `/circles/${encodeURIComponent(circleId)}/dates`
       );
 
       dates = Array.isArray(dateData)
@@ -893,9 +862,7 @@ async function openCircleDetails(circleId) {
     content.innerHTML = `
       <div class="circle-detail">
         <span class="eyebrow">
-          ${escapeHTML(
-            circle.type || "CUSTOM"
-          )}
+          ${escapeHTML(circle.type || "CUSTOM")}
         </span>
 
         <h2>
@@ -909,9 +876,7 @@ async function openCircleDetails(circleId) {
         <p>
           Contribution:
           <strong>
-            ${money(
-              circle.amountCents
-            )}
+            ${money(circle.amountCents)}
           </strong>
         </p>
 
@@ -919,8 +884,7 @@ async function openCircleDetails(circleId) {
           Members:
           <strong>
             ${
-              circle._count?.memberships ||
-              0
+              circle._count?.memberships || 0
             } / ${circle.capacity}
           </strong>
         </p>
@@ -929,9 +893,7 @@ async function openCircleDetails(circleId) {
           Status:
           <strong>
             ${escapeHTML(
-              prettyStatus(
-                circle.status
-              )
+              prettyStatus(circle.status)
             )}
           </strong>
         </p>
@@ -1018,8 +980,7 @@ async function openCircleDetails(circleId) {
       </div>
     `;
 
-    const joinButton =
-      $("#joinCircleButton");
+    const joinButton = $("#joinCircleButton");
 
     if (joinButton) {
       joinButton.addEventListener(
@@ -1050,9 +1011,7 @@ async function openCircleDetails(circleId) {
         </strong>
 
         <span>
-          ${escapeHTML(
-            error.message
-          )}
+          ${escapeHTML(error.message)}
         </span>
       </div>
     `;
@@ -1089,10 +1048,7 @@ async function reserveMembership() {
   );
 
   if (!selected) {
-    alert(
-      "Please select a payout date."
-    );
-
+    alert("Please select a payout date.");
     return;
   }
 
@@ -1127,8 +1083,7 @@ async function reserveMembership() {
 
     if (button) {
       button.disabled = false;
-      button.textContent =
-        "Join This Circle";
+      button.textContent = "Join This Circle";
     }
   }
 }
@@ -1154,7 +1109,6 @@ async function loadPayments() {
           </span>
         </div>
       `;
-
       return;
     }
 
@@ -1172,23 +1126,17 @@ async function loadPayments() {
               </strong>
 
               <span>
-                ${formatDateTime(
-                  payment.createdAt
-                )}
+                ${formatDateTime(payment.createdAt)}
               </span>
             </div>
 
             <strong>
-              ${money(
-                payment.amountCents
-              )}
+              ${money(payment.amountCents)}
             </strong>
 
             <span class="status-badge">
               ${escapeHTML(
-                prettyStatus(
-                  payment.status
-                )
+                prettyStatus(payment.status)
               )}
             </span>
           </article>
@@ -1203,9 +1151,7 @@ async function loadPayments() {
         </strong>
 
         <span>
-          ${escapeHTML(
-            error.message
-          )}
+          ${escapeHTML(error.message)}
         </span>
       </div>
     `;
@@ -1233,7 +1179,6 @@ async function loadPayouts() {
           </span>
         </div>
       `;
-
       return;
     }
 
@@ -1262,16 +1207,12 @@ async function loadPayouts() {
             </div>
 
             <strong>
-              ${money(
-                payout.amountCents
-              )}
+              ${money(payout.amountCents)}
             </strong>
 
             <span class="status-badge">
               ${escapeHTML(
-                prettyStatus(
-                  payout.status
-                )
+                prettyStatus(payout.status)
               )}
             </span>
           </article>
@@ -1286,9 +1227,7 @@ async function loadPayouts() {
         </strong>
 
         <span>
-          ${escapeHTML(
-            error.message
-          )}
+          ${escapeHTML(error.message)}
         </span>
       </div>
     `;
@@ -1300,40 +1239,32 @@ async function loadPayouts() {
 --------------------------------- */
 
 function activateAccountPanel(panelName) {
-  $$("[data-account-panel]").forEach(
-    (panel) => {
-      const target =
-        panel.dataset.accountPanel;
+  $$("[data-account-panel]").forEach((panel) => {
+    const target = panel.dataset.accountPanel;
 
-      if (target === panelName) {
-        show(panel);
-      } else {
-        hide(panel);
-      }
+    if (target === panelName) {
+      show(panel);
+    } else {
+      hide(panel);
     }
-  );
+  });
 
-  $$("[data-account-nav]").forEach(
-    (button) => {
-      button.classList.toggle(
-        "active",
-        button.dataset.accountNav ===
-          panelName
-      );
-    }
-  );
+  $$("[data-account-nav]").forEach((button) => {
+    button.classList.toggle(
+      "active",
+      button.dataset.accountNav === panelName
+    );
+  });
 }
 
 function bindAccountNavigation() {
-  $$("[data-account-nav]").forEach(
-    (button) => {
-      button.addEventListener("click", () => {
-        activateAccountPanel(
-          button.dataset.accountNav
-        );
-      });
-    }
-  );
+  $$("[data-account-nav]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activateAccountPanel(
+        button.dataset.accountNav
+      );
+    });
+  });
 }
 
 /* --------------------------------
@@ -1362,19 +1293,13 @@ function bindProfileMenu() {
 
 function bindLogoutButtons() {
   $$("[data-logout]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      logout
-    );
+    button.addEventListener("click", logout);
   });
 
   const logoutButton = $("#logoutButton");
 
   if (logoutButton) {
-    logoutButton.addEventListener(
-      "click",
-      logout
-    );
+    logoutButton.addEventListener("click", logout);
   }
 }
 
@@ -1451,30 +1376,22 @@ function bindForms() {
 --------------------------------- */
 
 function bindPublicNavigation() {
-  $$("[data-scroll-to]").forEach(
-    (button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          const selector =
-            button.dataset.scrollTo;
+  $$("[data-scroll-to]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const selector = button.dataset.scrollTo;
 
-          if (!selector) return;
+      if (!selector) return;
 
-          const target =
-            document.querySelector(
-              selector
-            );
+      const target =
+        document.querySelector(selector);
 
-          if (target) {
-            target.scrollIntoView({
-              behavior: "smooth"
-            });
-          }
-        }
-      );
-    }
-  );
+      if (target) {
+        target.scrollIntoView({
+          behavior: "smooth"
+        });
+      }
+    });
+  });
 }
 
 /* --------------------------------
@@ -1485,28 +1402,22 @@ async function createPayPalOrder(
   circleId,
   membershipId
 ) {
-  return api(
-    "/paypal/create-order",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        circleId,
-        membershipId
-      })
-    }
-  );
+  return api("/paypal/create-order", {
+    method: "POST",
+    body: JSON.stringify({
+      circleId,
+      membershipId
+    })
+  });
 }
 
 async function capturePayPalOrder(orderId) {
-  return api(
-    "/paypal/capture-order",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        orderId
-      })
-    }
-  );
+  return api("/paypal/capture-order", {
+    method: "POST",
+    body: JSON.stringify({
+      orderId
+    })
+  });
 }
 
 /* --------------------------------
@@ -1514,6 +1425,13 @@ async function capturePayPalOrder(orderId) {
 --------------------------------- */
 
 async function initialize() {
+  /*
+     Bind all interactive controls FIRST.
+     This ensures login/register continue
+     working even if public circle loading
+     encounters a network problem.
+  */
+
   bindAuthButtons();
   bindAccountNavigation();
   bindProfileMenu();
@@ -1522,7 +1440,21 @@ async function initialize() {
   bindForms();
   bindPublicNavigation();
 
-  await loadPublicCircles();
+  /*
+     Public circles are secondary.
+     Do not allow them to block login.
+  */
+
+  loadPublicCircles().catch((error) => {
+    console.error(
+      "Public circle loading error:",
+      error
+    );
+  });
+
+  /*
+     Check the current session separately.
+  */
 
   const user = await getCurrentUser();
 
@@ -1535,8 +1467,10 @@ async function initialize() {
     renderMemberships(user);
     renderAccountBalance(user);
 
-    await loadPayments();
-    await loadPayouts();
+    await Promise.allSettled([
+      loadPayments(),
+      loadPayouts()
+    ]);
 
     activateAccountPanel("overview");
   } else {
@@ -1558,15 +1492,11 @@ document.addEventListener(
       );
 
       /*
-         Never allow a frontend initialization
-         error to leave the entire site blank.
+         Keep the public site visible if
+         session checking fails.
       */
 
-      const publicSite = $("#publicSite");
-
-      if (publicSite) {
-        show(publicSite);
-      }
+      showPublicSite();
     });
   }
 );
