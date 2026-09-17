@@ -1270,7 +1270,6 @@ async function submitCircleMembership(event) {
 /* =========================
    MODALS
 ========================= */
-
 function bindModalButtons() {
   const closeCircle =
     $("#closeCircleModal");
@@ -1294,6 +1293,32 @@ function bindModalButtons() {
       (event) => {
         event.preventDefault();
         closeCircleDetails();
+      }
+    );
+  }
+
+  const dashboardCreateCircle =
+    $("#dashboardCreateCircle");
+
+  if (dashboardCreateCircle) {
+    dashboardCreateCircle.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        openCircleModal();
+      }
+    );
+  }
+
+  const circlesCreateButton =
+    $("#circlesCreateButton");
+
+  if (circlesCreateButton) {
+    circlesCreateButton.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        openCircleModal();
       }
     );
   }
