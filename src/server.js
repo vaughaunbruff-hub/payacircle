@@ -1225,39 +1225,6 @@ app.post(
           100
         ).toFixed(2);
 
-      const existing =
-        await prisma.payment.findFirst(
-          {
-            where: {
-              userId:
-                req.user.id,
-
-              circleId:
-                circle.id,
-
-              status:
-                "CREATED",
-
-              paypalOrderId: {
-                not: null
-              }
-            },
-
-            orderBy: {
-              createdAt: "desc"
-            }
-          }
-        );
-
-      if (
-        existing?.paypalOrderId
-      ) {
-        return res.json({
-          orderId:
-            existing.paypalOrderId
-        });
-      }
-
       const order =
         await paypalRequest(
           "/v2/checkout/orders",
@@ -1345,11 +1312,11 @@ app.post(
           payment.id,
 
         approvalUrl:
-          order.links?.find(
-            (link) =>
-              link.rel ===
-              "approve"
-          )?.href || null
+  order.links?.find(
+    (link) =>
+      link.rel === "approve" ||
+      link.rel === "payer-action"
+  )?.href || null
       });
     } catch (error) {
       console.error(
