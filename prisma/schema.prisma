@@ -63,6 +63,7 @@ model User {
   role Role @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   memberships Membership[]
   payments Payment[]
   payouts Payout[]
@@ -75,10 +76,14 @@ model Circle {
   type CircleType @default(CUSTOM)
   amountCents Int
   capacity Int
+
+  // Kept for compatibility with the existing application.
   houseFeeCents Int @default(10000)
+
   status CircleStatus @default(COLLECTING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   memberships Membership[]
   payoutDates PayoutDate[]
   payments Payment[]
@@ -91,10 +96,12 @@ model PayoutDate {
   payoutAt DateTime
   capacity Int @default(1)
   reserved Int @default(0)
-  circle Circle @relation(fields:[circleId], references:[id])
+
+  circle Circle @relation(fields: [circleId], references: [id])
   memberships Membership[]
   payouts Payout[]
-  @@unique([circleId,payoutAt])
+
+  @@unique([circleId, payoutAt])
 }
 
 model Membership {
@@ -102,15 +109,20 @@ model Membership {
   userId String
   circleId String
   payoutDateId String?
+
   status MembershipStatus @default(RESERVED)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  circle Circle @relation(fields:[circleId], references:[id])
-  payoutDate PayoutDate? @relation(fields:[payoutDateId], references:[id])
+
+  user User @relation(fields: [userId], references: [id])
+  circle Circle @relation(fields: [circleId], references: [id])
+  payoutDate PayoutDate? @relation(fields: [payoutDateId], references: [id])
+
   payments Payment[]
   payout Payout?
-  @@unique([userId,circleId])
+
+  @@unique([userId, circleId])
 }
 
 model Payment {
@@ -118,34 +130,81 @@ model Payment {
   userId String
   circleId String
   membershipId String?
+
   paypalOrderId String? @unique
   paypalCaptureId String? @unique
+
   amountCents Int
   paypalFeeCents Int?
+
   status PaymentStatus @default(CREATED)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  circle Circle @relation(fields:[circleId], references:[id])
-  membership Membership? @relation(fields:[membershipId], references:[id])
+
+  user User @relation(fields: [userId], references: [id])
+  circle Circle @relation(fields: [circleId], references: [id])
+  membership Membership? @relation(fields: [membershipId], references: [id])
 }
 
 model Payout {
   id String @id @default(cuid())
+
   userId String
   circleId String
   membershipId String @unique
   payoutDateId String
-  amountCents Int
+
+  // Original amount the member is entitled to before the
+  // PayaCircle banker fee is deducted.
+  grossAmountCents Int
+
+  // Banker fee percentage captured when this payout was created.
+  // Stored as basis points:
+  // 700 = 7.00%
+  bankerFeeBps Int
+
+  // Actual banker fee deducted from the member's payout.
+  bankerFeeCents Int
+
+  // Actual PayPal payout processing fee paid by PayaCircle.
+  // This is internal and is NOT shown to the member.
+  paypalFeeCents Int @default(0)
+
+  // Amount the member actually receives.
+  netAmountCents Int
+
+  // PayPal account used for this particular payout.
+  // Stored as a snapshot so future PayPal email changes
+  // do not alter historical payout records.
+  paypalEmail String
+
   status PayoutStatus @default(SCHEDULED)
+
   paypalBatchId String?
   paypalItemId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  circle Circle @relation(fields:[circleId], references:[id])
-  membership Membership @relation(fields:[membershipId], references:[id])
-  payoutDate PayoutDate @relation(fields:[payoutDateId], references:[id])
+
+  user User @relation(fields: [userId], references: [id])
+  circle Circle @relation(fields: [circleId], references: [id])
+  membership Membership @relation(fields: [membershipId], references: [id])
+  payoutDate PayoutDate @relation(fields: [payoutDateId], references: [id])
+}
+
+model SystemSetting {
+  id String @id @default(cuid())
+
+  // Examples:
+  // BANKER_FEE_BPS = "700" for 7.00%
+  key String @unique
+  value String
+
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AuditLog {
