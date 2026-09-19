@@ -77,7 +77,7 @@ model Circle {
   amountCents Int
   capacity Int
 
-  // Kept for compatibility with the existing application.
+  // Existing field kept for application compatibility.
   houseFeeCents Int @default(10000)
 
   status CircleStatus @default(COLLECTING)
@@ -155,28 +155,25 @@ model Payout {
   membershipId String @unique
   payoutDateId String
 
-  // Original amount the member is entitled to before the
-  // PayaCircle banker fee is deducted.
+  // Original payout amount before the banker fee.
   grossAmountCents Int
 
-  // Banker fee percentage captured when this payout was created.
-  // Stored as basis points:
-  // 700 = 7.00%
+  // PayaCircle banker fee stored as basis points.
+  // Example: 700 = 7.00%.
   bankerFeeBps Int
 
-  // Actual banker fee deducted from the member's payout.
+  // Banker fee deducted from the member's payout.
   bankerFeeCents Int
 
-  // Actual PayPal payout processing fee paid by PayaCircle.
-  // This is internal and is NOT shown to the member.
+  // Actual PayPal payout fee.
+  // This is internal and is NOT displayed to members.
   paypalFeeCents Int @default(0)
 
-  // Amount the member actually receives.
+  // Final amount sent to the member.
   netAmountCents Int
 
-  // PayPal account used for this particular payout.
-  // Stored as a snapshot so future PayPal email changes
-  // do not alter historical payout records.
+  // PayPal receiving address used for this payout.
+  // Saved as a snapshot for historical records.
   paypalEmail String
 
   status PayoutStatus @default(SCHEDULED)
@@ -196,8 +193,8 @@ model Payout {
 model SystemSetting {
   id String @id @default(cuid())
 
-  // Examples:
-  // BANKER_FEE_BPS = "700" for 7.00%
+  // Example:
+  // BANKER_FEE_BPS = "700" means 7.00%.
   key String @unique
   value String
 
