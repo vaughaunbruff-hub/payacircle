@@ -2049,7 +2049,9 @@ app.post(
 
                 include: {
                   circle: true,
-                  payoutDate: true
+                  payoutDate: true,
+                  user: true,
+                  payout: true
                 }
               });
 
@@ -2080,19 +2082,42 @@ app.post(
 
             if (
               membership.status ===
-              "CANCELLED"
+                "CANCELLED" ||
+              membership.status ===
+                "REFUNDED"
             ) {
               throw new Error(
                 "This membership has been cancelled"
               );
             }
 
+            /*
+              A payout week can only be selected
+              after the member has completed
+              their contribution.
+            */
+
+            if (
+              membership.status !==
+              "PAID"
+            ) {
+              throw new Error(
+                "Please complete your contribution before selecting a payout week"
+              );
+            }
+
+            /*
+              The circle must already be full
+              and the weekly schedule must
+              have been created.
+            */
+
             if (
               membership.circle.status !==
               "READY"
             ) {
               throw new Error(
-                "The payout schedule is not ready yet"
+                "The payout schedule is not ready yet. Your circle must be full first."
               );
             }
 
@@ -2116,6 +2141,11 @@ app.post(
               throw error;
             }
 
+            /*
+              Make absolutely sure the selected
+              week belongs to this circle.
+            */
+
             if (
               payoutDate.circleId !==
               membership.circleId
@@ -2126,10 +2156,9 @@ app.post(
             }
 
             /*
-              Reserve the new week FIRST.
-              This prevents a failed selection
-              from accidentally releasing the
-              member's existing week.
+              If the member clicks the week they
+              already have, simply return the
+              current membership.
             */
 
             if (
@@ -2138,6 +2167,13 @@ app.post(
             ) {
               return membership;
             }
+
+            /*
+              Reserve the new week atomically.
+              This prevents two members from
+              successfully selecting the same
+              available week at the same time.
+            */
 
             const reserved =
               await tx.payoutDate.updateMany({
@@ -2166,13 +2202,23 @@ app.post(
               );
             }
 
+            /*
+              Release the member's previous week
+              only after the new week has been
+              successfully reserved.
+            */
+
             if (
               membership.payoutDateId
             ) {
-              await tx.payoutDate.update({
+              await tx.payoutDate.updateMany({
                 where: {
                   id:
-                    membership.payoutDateId
+                    membership.payoutDateId,
+
+                  reserved: {
+                    gt: 0
+                  }
                 },
 
                 data: {
@@ -2183,6 +2229,10 @@ app.post(
               });
             }
 
+            /*
+              Save the new payout week.
+            */
+
             const updated =
               await tx.membership.update({
                 where: {
@@ -2192,28 +2242,63 @@ app.post(
 
                 data: {
                   payoutDateId:
-                    payoutDate.id
+                    payoutDate.id,
+
+                  status:
+                    "PAID"
                 },
 
                 include: {
                   circle: true,
-                  payoutDate: true
+                  payoutDate: true,
+                  user: true,
+                  payout: true
                 }
               });
+
+            /*
+              If a payout record already exists,
+              move that payout record to the newly
+              selected week.
+
+              If one does not exist and the member
+              has a PayPal email, create it.
+            */
+
+            if (updated.payout) {
+              await tx.payout.update({
+                where: {
+                  id:
+                    updated.payout.id
+                },
+
+                data: {
+                  payoutDateId:
+                    payoutDate.id
+                }
+              });
+            }
 
             return updated;
           }
         );
 
       /*
-        If the member already paid and has a
-        PayPal email, make sure the payout record
-        reflects the newly selected week.
+        If the member has selected a payout week
+        but no payout record exists yet, create it
+        after the transaction completes.
+
+        This is intentionally separate because
+        createPayoutForMembership() uses the main
+        Prisma client rather than the transaction
+        client.
       */
 
+      let finalMembership =
+        result;
+
       if (
-        result.status ===
-          "PAID" &&
+        result.status === "PAID" &&
         result.payoutDateId
       ) {
         try {
@@ -2236,6 +2321,25 @@ app.post(
             error
           );
         }
+
+        /*
+          Reload the membership so the frontend
+          receives the latest payout information.
+        */
+
+        finalMembership =
+          await prisma.membership.findUnique({
+            where: {
+              id:
+                result.id
+            },
+
+            include: {
+              circle: true,
+              payoutDate: true,
+              payout: true
+            }
+          });
       }
 
       res.json({
@@ -2245,9 +2349,14 @@ app.post(
           "Your preferred payout week has been saved.",
 
         membership:
-          result
+          finalMembership
       });
     } catch (error) {
+      console.error(
+        "Payout week selection error:",
+        error
+      );
+
       res.status(
         error?.status || 400
       ).json({
