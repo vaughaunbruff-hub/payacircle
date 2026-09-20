@@ -1522,7 +1522,7 @@ async function createCircle(
 /* --------------------------------
    PAYMENT PANEL
 --------------------------------- */
-function renderPaymentDetails(
+async function renderPaymentDetails(
   circle,
   membership
 ) {
@@ -1534,9 +1534,39 @@ function renderPaymentDetails(
   }
 
   const contributionCents =
-    Number(circle?.amountCents || 0);
+    Number(
+      circle?.amountCents || 0
+    );
 
-  const bankerFeeBps = 700;
+  let bankerFeeBps = 700;
+
+  try {
+    const feeSettings =
+      await api(
+        "/settings/banker-fee"
+      );
+
+    bankerFeeBps =
+      Number(
+        feeSettings?.bankerFeeBps
+      );
+
+    if (
+      !Number.isFinite(
+        bankerFeeBps
+      )
+    ) {
+      bankerFeeBps = 700;
+    }
+  } catch (error) {
+    console.error(
+      "Unable to load Banker Fee:",
+      error
+    );
+  }
+
+  const bankerFeePercent =
+    bankerFeeBps / 100;
 
   const bankerFeeCents =
     Math.round(
@@ -1576,7 +1606,7 @@ function renderPaymentDetails(
     <div class="payment-detail-row">
       <span>PayaCircle Banker Fee</span>
       <strong>
-        7%
+        ${bankerFeePercent.toFixed(2)}%
       </strong>
     </div>
 
