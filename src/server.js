@@ -33,6 +33,7 @@ app.use(
     }
   })
 );
+
 app.use(cookieParser());
 
 app.use(
@@ -66,8 +67,10 @@ const PAYPAL_CLIENT_ID =
 
 const PAYPAL_CLIENT_SECRET =
   process.env.PAYPAL_CLIENT_SECRET;
+
 const PAYPAL_WEBHOOK_ID =
   process.env.PAYPAL_WEBHOOK_ID;
+
 const DEFAULT_BANKER_FEE_BPS = 700;
 
 /* --------------------------------
@@ -127,14 +130,40 @@ function auth(req, res, next) {
   }
 }
 
-function adminOnly(req, res, next) {
-  if (req.user?.role !== "ADMIN") {
-    return res.status(403).json({
-      error: "Admin access required"
+/*
+  Do not trust the role stored inside the JWT.
+  Check the current database role so an admin
+  demotion takes effect immediately.
+*/
+async function adminOnly(req, res, next) {
+  try {
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: req.user?.id
+        },
+        select: {
+          role: true
+        }
+      });
+
+    if (!user || user.role !== "ADMIN") {
+      return res.status(403).json({
+        error: "Admin access required"
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error(
+      "Admin authorization error:",
+      error
+    );
+
+    return res.status(500).json({
+      error: "Unable to verify admin access"
     });
   }
-
-  next();
 }
 
 /* --------------------------------
@@ -303,7 +332,7 @@ async function getBankerFeeBps() {
   if (
     !Number.isFinite(value) ||
     value < 0 ||
-    value > 10000
+    value > 9900
   ) {
     return DEFAULT_BANKER_FEE_BPS;
   }
@@ -359,6 +388,59 @@ async function ensureBankerFeeSetting() {
 }
 
 /* --------------------------------
+   CIRCLE FUNDING CHECK
+--------------------------------- */
+
+async function circleIsFullyFunded(
+  circleId
+) {
+  const circle =
+    await prisma.circle.findUnique({
+      where: {
+        id: circleId
+      }
+    });
+
+  if (!circle) {
+    return false;
+  }
+
+  if (
+    circle.status !==
+    "READY"
+  ) {
+    return false;
+  }
+
+  const activeMemberCount =
+    await prisma.membership.count({
+      where: {
+        circleId,
+
+        status: {
+          not: "CANCELLED"
+        }
+      }
+    });
+
+  const paidMemberCount =
+    await prisma.membership.count({
+      where: {
+        circleId,
+
+        status: "PAID"
+      }
+    });
+
+  return (
+    activeMemberCount ===
+      circle.capacity &&
+    paidMemberCount ===
+      circle.capacity
+  );
+}
+
+/* --------------------------------
    CREATE PAYOUT RECORD
 --------------------------------- */
 
@@ -398,8 +480,17 @@ async function createPayoutForMembership(
     return null;
   }
 
-  if (membership.payout) {
-    return membership.payout;
+  /*
+    Never create a payout record before the
+    entire circle has been funded.
+  */
+  const fullyFunded =
+    await circleIsFullyFunded(
+      membership.circleId
+    );
+
+  if (!fullyFunded) {
+    return null;
   }
 
   if (!membership.user.paypalEmail) {
@@ -407,14 +498,20 @@ async function createPayoutForMembership(
   }
 
   /*
-    The full circle pool is:
+    If a payout already exists, return it.
+  */
+  if (membership.payout) {
+    return membership.payout;
+  }
+
+  /*
+    The payout pool is:
 
     contribution × number of members
 
-    The member-facing banker fee is then
-    deducted from that gross payout.
+    The banker fee is deducted from the
+    member-facing payout.
   */
-
   const grossAmountCents =
     membership.circle.amountCents *
     membership.circle.capacity;
@@ -428,9 +525,29 @@ async function createPayoutForMembership(
       bankerFeeBps
     );
 
+  if (
+    amounts.netAmountCents <= 0
+  ) {
+    throw new Error(
+      "Payout amount must be greater than zero"
+    );
+  }
+
+  /*
+    membershipId is UNIQUE in the database,
+    so upsert prevents duplicate payout
+    records if two requests happen together.
+  */
   const payout =
-    await prisma.payout.create({
-      data: {
+    await prisma.payout.upsert({
+      where: {
+        membershipId:
+          membership.id
+      },
+
+      update: {},
+
+      create: {
         userId:
           membership.userId,
 
@@ -470,66 +587,244 @@ async function createPayoutForMembership(
 }
 
 /* --------------------------------
-   PROCESS DUE PAYOUTS
+   CREATE PAYOUTS FOR FULL CIRCLE
 --------------------------------- */
 
-let payoutProcessorRunning = false;
+async function ensurePayoutsForFullyPaidCircle(
+  circleId
+) {
+  const fullyFunded =
+    await circleIsFullyFunded(
+      circleId
+    );
 
-async function processDuePayouts() {
-  if (payoutProcessorRunning) {
+  if (!fullyFunded) {
     return;
   }
 
-  payoutProcessorRunning = true;
+  const memberships =
+    await prisma.membership.findMany({
+      where: {
+        circleId,
 
-  try {
-    const now =
-      new Date();
+        status: "PAID",
 
-    const payouts =
-      await prisma.payout.findMany({
-        where: {
-          status: "SCHEDULED",
-
-          payoutDate: {
-            payoutAt: {
-              lte: now
-            }
-          }
+        payoutDateId: {
+          not: null
         },
 
-        include: {
-          user: true,
-          circle: true,
-          payoutDate: true,
-          membership: true
-        },
+        payout: null
+      },
 
-        orderBy: {
-          payoutDate: {
-            payoutAt: "asc"
-          }
-        },
+      select: {
+        id: true
+      }
+    });
 
-        take: 25
-      });
-
-    for (const payout of payouts) {
-      await sendPayout(
-        payout
+  for (const membership of memberships) {
+    try {
+      await createPayoutForMembership(
+        membership.id
+      );
+    } catch (error) {
+      console.error(
+        `Unable to create payout for membership ${membership.id}:`,
+        error
       );
     }
-  } catch (error) {
-    console.error(
-      "Payout processor error:",
-      error
-    );
-  } finally {
-    payoutProcessorRunning = false;
   }
 }
 
-async function sendPayout(payout) {
+/* --------------------------------
+   PAYPAL PAYOUT STATUS
+--------------------------------- */
+
+function payoutStatusFromPayPalStatus(
+  value
+) {
+  const status =
+    String(
+      value || ""
+    ).toUpperCase();
+
+  if (
+    status === "SUCCESS" ||
+    status === "SUCCEEDED"
+  ) {
+    return "COMPLETED";
+  }
+
+  if (
+    status === "RETURNED" ||
+    status === "REFUNDED" ||
+    status === "UNCLAIMED"
+  ) {
+    return "RETURNED";
+  }
+
+  if (
+    status === "FAILED" ||
+    status === "BLOCKED" ||
+    status === "CANCELED" ||
+    status === "CANCELLED" ||
+    status === "DENIED"
+  ) {
+    return "FAILED";
+  }
+
+  if (
+    status === "HELD" ||
+    status === "PROCESSING" ||
+    status === "PENDING" ||
+    status === "NEW"
+  ) {
+    return "PROCESSING";
+  }
+
+  return null;
+}
+
+/* --------------------------------
+   RECONCILE PAYPAL PAYOUT
+--------------------------------- */
+
+async function reconcilePayout(
+  payout
+) {
+  if (
+    !payout.paypalBatchId
+  ) {
+    return false;
+  }
+
+  try {
+    const batch =
+      await paypalRequest(
+        `/v1/payments/payouts/${encodeURIComponent(
+          payout.paypalBatchId
+        )}`,
+        {
+          method: "GET"
+        }
+      );
+
+    const items =
+      batch?.items ||
+      batch?.payout_items ||
+      [];
+
+    const matchingItem =
+      items.find(
+        (item) =>
+          item?.payout_item
+            ?.sender_item_id ===
+            payout.id ||
+          item?.sender_item_id ===
+            payout.id
+      );
+
+    const resource =
+      matchingItem?.payout_item ||
+      matchingItem ||
+      {};
+
+    const paypalItemId =
+      resource?.payout_item_id ||
+      payout.paypalItemId ||
+      null;
+
+    const itemStatus =
+      resource?.transaction_status ||
+      resource?.transaction_status ||
+      batch?.batch_header
+        ?.batch_status ||
+      null;
+
+    const mappedStatus =
+      payoutStatusFromPayPalStatus(
+        itemStatus
+      );
+
+    const feeValue =
+      resource?.payout_item_fee
+        ?.value;
+
+    const paypalFeeCents =
+      feeValue !== undefined &&
+      feeValue !== null &&
+      Number.isFinite(
+        Number(feeValue)
+      )
+        ? Math.round(
+            Number(feeValue) * 100
+          )
+        : payout.paypalFeeCents;
+
+    const updateData = {
+      paypalBatchId:
+        payout.paypalBatchId,
+
+      paypalItemId,
+
+      paypalFeeCents
+    };
+
+    if (mappedStatus) {
+      updateData.status =
+        mappedStatus;
+    }
+
+    await prisma.payout.update({
+      where: {
+        id: payout.id
+      },
+
+      data: updateData
+    });
+
+    if (
+      mappedStatus ===
+      "COMPLETED"
+    ) {
+      await prisma.membership.updateMany({
+        where: {
+          id:
+            payout.membershipId
+        },
+
+        data: {
+          status:
+            "PAID_OUT"
+        }
+      });
+    }
+
+    console.log(
+      `Reconciled PayaCircle payout ${payout.id}: ${mappedStatus || "PROCESSING"}`
+    );
+
+    return true;
+  } catch (error) {
+    /*
+      A temporary PayPal error should not
+      turn a legitimate payout into FAILED.
+    */
+    console.error(
+      `Unable to reconcile payout ${payout.id}:`,
+      error
+    );
+
+    return false;
+  }
+}
+
+/* --------------------------------
+   SEND PAYOUT
+--------------------------------- */
+
+async function sendPayout(
+  payout
+) {
   if (
     payout.status !==
     "SCHEDULED"
@@ -537,9 +832,41 @@ async function sendPayout(payout) {
     return;
   }
 
+  /*
+    Do not pay until the complete circle
+    has been funded.
+  */
+  const fullyFunded =
+    await circleIsFullyFunded(
+      payout.circleId
+    );
+
+  if (!fullyFunded) {
+    console.log(
+      `Payout ${payout.id} waiting for full circle funding.`
+    );
+
+    return;
+  }
+
+  /*
+    A missing PayPal email is not a permanent
+    failure. Keep it scheduled so the payout
+    can proceed after the user adds their email.
+  */
   if (!payout.paypalEmail) {
+    console.log(
+      `Payout ${payout.id} waiting for PayPal email.`
+    );
+
+    return;
+  }
+
+  if (
+    payout.netAmountCents <= 0
+  ) {
     console.error(
-      `Payout ${payout.id} has no PayPal email`
+      `Payout ${payout.id} has an invalid net amount.`
     );
 
     await prisma.payout.update({
@@ -557,11 +884,8 @@ async function sendPayout(payout) {
   }
 
   /*
-    Mark it PROCESSING before contacting PayPal.
-    This prevents the local processor from
-    attempting the same payout repeatedly.
+    Claim the payout before contacting PayPal.
   */
-
   const claimed =
     await prisma.payout.updateMany({
       where: {
@@ -587,6 +911,9 @@ async function sendPayout(payout) {
     const senderItemId =
       payout.id;
 
+    const senderBatchId =
+      `PAYACIRCLE-${payout.id}`;
+
     const amount =
       (
         payout.netAmountCents /
@@ -599,11 +926,20 @@ async function sendPayout(payout) {
         {
           method: "POST",
 
+          headers: {
+            /*
+              Same ID is reused if Railway
+              retries this exact payout.
+            */
+            "PayPal-Request-Id":
+              senderBatchId
+          },
+
           body:
             JSON.stringify({
               sender_batch_header: {
                 sender_batch_id:
-                  `PAYACIRCLE-${payout.id}`,
+                  senderBatchId,
 
                 email_subject:
                   "Your PayaCircle payout is on the way",
@@ -644,12 +980,10 @@ async function sendPayout(payout) {
         ?.payout_batch_id ||
       null;
 
-    /*
-      PayPal normally returns the batch as
-      PENDING/PROCESSING. The webhook will
-      move our record to COMPLETED when PayPal
-      confirms the individual payout.
-    */
+    const batchStatus =
+      result?.batch_header
+        ?.batch_status ||
+      null;
 
     await prisma.payout.update({
       where: {
@@ -666,7 +1000,7 @@ async function sendPayout(payout) {
     });
 
     console.log(
-      `PayaCircle payout ${payout.id} sent to PayPal. Batch: ${batchId}`
+      `PayaCircle payout ${payout.id} sent to PayPal. Batch: ${batchId}. Status: ${batchStatus || "PENDING"}`
     );
   } catch (error) {
     console.error(
@@ -674,16 +1008,187 @@ async function sendPayout(payout) {
       error
     );
 
-    await prisma.payout.update({
-      where: {
-        id: payout.id
-      },
+    /*
+      Temporary PayPal/server/network errors
+      remain scheduled so they can retry.
 
-      data: {
-        status:
-          "FAILED"
+      Definitive 4xx errors become FAILED.
+    */
+    const status =
+      Number(error?.status || 0);
+
+    if (
+      status >= 400 &&
+      status < 500 &&
+      status !== 409
+    ) {
+      await prisma.payout.update({
+        where: {
+          id: payout.id
+        },
+
+        data: {
+          status:
+            "FAILED"
+        }
+      });
+    } else {
+      await prisma.payout.update({
+        where: {
+          id: payout.id
+        },
+
+        data: {
+          status:
+            "SCHEDULED"
+        }
+      });
+    }
+  }
+}
+
+/* --------------------------------
+   RECOVER PROCESSING PAYOUTS
+--------------------------------- */
+
+async function recoverProcessingPayouts() {
+  try {
+    const payouts =
+      await prisma.payout.findMany({
+        where: {
+          status:
+            "PROCESSING"
+        },
+
+        include: {
+          user: true,
+          circle: true,
+          payoutDate: true,
+          membership: true
+        },
+
+        orderBy: {
+          updatedAt: "asc"
+        },
+
+        take: 25
+      });
+
+    for (const payout of payouts) {
+      /*
+        If PayPal already gave us a batch ID,
+        reconcile it instead of sending money again.
+      */
+      if (
+        payout.paypalBatchId
+      ) {
+        await reconcilePayout(
+          payout
+        );
+
+        continue;
       }
-    });
+
+      /*
+        If Railway crashed after PayPal accepted
+        the request but before the batch ID was
+        saved, retrying with the SAME sender
+        batch/request ID prevents a duplicate.
+      */
+      if (
+        payout.paypalEmail
+      ) {
+        const scheduledPayout =
+          {
+            ...payout,
+            status:
+              "SCHEDULED"
+          };
+
+        await prisma.payout.update({
+          where: {
+            id: payout.id
+          },
+
+          data: {
+            status:
+              "SCHEDULED"
+          }
+        });
+
+        await sendPayout(
+          scheduledPayout
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "Payout recovery error:",
+      error
+    );
+  }
+}
+
+/* --------------------------------
+   PROCESS DUE PAYOUTS
+--------------------------------- */
+
+let payoutProcessorRunning = false;
+
+async function processDuePayouts() {
+  if (payoutProcessorRunning) {
+    return;
+  }
+
+  payoutProcessorRunning = true;
+
+  try {
+    await recoverProcessingPayouts();
+
+    const now =
+      new Date();
+
+    const payouts =
+      await prisma.payout.findMany({
+        where: {
+          status:
+            "SCHEDULED",
+
+          payoutDate: {
+            payoutAt: {
+              lte: now
+            }
+          }
+        },
+
+        include: {
+          user: true,
+          circle: true,
+          payoutDate: true,
+          membership: true
+        },
+
+        orderBy: {
+          payoutDate: {
+            payoutAt: "asc"
+          }
+        },
+
+        take: 25
+      });
+
+    for (const payout of payouts) {
+      await sendPayout(
+        payout
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Payout processor error:",
+      error
+    );
+  } finally {
+    payoutProcessorRunning = false;
   }
 }
 
@@ -918,7 +1423,8 @@ app.get(
 
     if (!user) {
       return res.status(404).json({
-        error: "User not found"
+        error:
+          "User not found"
       });
     }
 
@@ -972,11 +1478,9 @@ app.patch(
         });
 
       /*
-        If the user already paid and selected
-        a payout week, create the payout record
-        now that their PayPal email exists.
+        Find paid memberships that already
+        have a payout week selected.
       */
-
       const memberships =
         await prisma.membership.findMany({
           where: {
@@ -988,9 +1492,7 @@ app.patch(
 
             payoutDateId: {
               not: null
-            },
-
-            payout: null
+            }
           },
 
           select: {
@@ -998,6 +1500,10 @@ app.patch(
           }
         });
 
+      /*
+        Once the email is saved, create any
+        payout records that are now eligible.
+      */
       for (const membership of memberships) {
         try {
           await createPayoutForMembership(
@@ -1011,8 +1517,38 @@ app.patch(
         }
       }
 
+      /*
+        Also check whether the entire circle
+        became fully funded.
+      */
+      const membershipRows =
+        await prisma.membership.findMany({
+          where: {
+            userId:
+              req.user.id,
+
+            status:
+              "PAID",
+
+            payoutDateId: {
+              not: null
+            }
+          },
+
+          select: {
+            circleId: true
+          }
+        });
+
+      for (const row of membershipRows) {
+        await ensurePayoutsForFullyPaidCircle(
+          row.circleId
+        );
+      }
+
       res.json({
         ok: true,
+
         paypalEmail:
           user.paypalEmail
       });
@@ -1100,7 +1636,7 @@ app.put(
           percent:
             z.number()
               .min(0)
-              .max(100)
+              .max(99)
         })
         .safeParse(
           req.body
@@ -1109,7 +1645,7 @@ app.put(
     if (!parsed.success) {
       return res.status(400).json({
         error:
-          "Banker fee must be between 0% and 100%"
+          "Banker fee must be between 0% and 99%"
       });
     }
 
@@ -1300,18 +1836,17 @@ app.post(
         await prisma.$transaction(
           async (tx) => {
             const membership =
-              await tx.membership.findUnique(
-                {
-                  where: {
-                    id: membershipId
-                  },
+              await tx.membership.findUnique({
+                where: {
+                  id:
+                    membershipId
+                },
 
-                  include: {
-                    circle: true,
-                    payoutDate: true
-                  }
+                include: {
+                  circle: true,
+                  payoutDate: true
                 }
-              );
+              });
 
             if (!membership) {
               const error =
@@ -1369,17 +1904,15 @@ app.post(
             }
 
             const hasCapturedPayment =
-              await tx.payment.findFirst(
-                {
-                  where: {
-                    membershipId:
-                      membership.id,
+              await tx.payment.findFirst({
+                where: {
+                  membershipId:
+                    membership.id,
 
-                    status:
-                      "CAPTURED"
-                  }
+                  status:
+                    "CAPTURED"
                 }
-              );
+              });
 
             if (hasCapturedPayment) {
               const error =
@@ -1395,10 +1928,14 @@ app.post(
             if (
               membership.payoutDateId
             ) {
-              await tx.payoutDate.update({
+              await tx.payoutDate.updateMany({
                 where: {
                   id:
-                    membership.payoutDateId
+                    membership.payoutDateId,
+
+                  reserved: {
+                    gt: 0
+                  }
                 },
 
                 data: {
@@ -1410,27 +1947,25 @@ app.post(
             }
 
             const updated =
-              await tx.membership.update(
-                {
-                  where: {
-                    id:
-                      membership.id
-                  },
+              await tx.membership.update({
+                where: {
+                  id:
+                    membership.id
+                },
 
-                  data: {
-                    status:
-                      "CANCELLED",
+                data: {
+                  status:
+                    "CANCELLED",
 
-                    payoutDateId:
-                      null
-                  },
+                  payoutDateId:
+                    null
+                },
 
-                  include: {
-                    circle: true,
-                    payoutDate: true
-                  }
+                include: {
+                  circle: true,
+                  payoutDate: true
                 }
-              );
+              });
 
             return updated;
           }
@@ -1658,9 +2193,23 @@ app.post(
     } = parsed.data;
 
     try {
+      /*
+        Lock the circle row while checking
+        capacity and adding a member.
+
+        This prevents two people joining the
+        last available position simultaneously.
+      */
       const result =
         await prisma.$transaction(
           async (tx) => {
+            await tx.$queryRaw`
+              SELECT id
+              FROM "Circle"
+              WHERE id = ${circleId}
+              FOR UPDATE
+            `;
+
             const circle =
               await tx.circle.findUnique({
                 where: {
@@ -1711,42 +2260,52 @@ app.post(
                 }
               });
 
-            if (existing) {
-              if (
-                existing.status !==
+            /*
+              Existing active membership.
+            */
+            if (
+              existing &&
+              existing.status !==
                 "CANCELLED"
-              ) {
-                return {
-                  membership:
-                    await tx.membership.findUnique({
-                      where: {
-                        id:
-                          existing.id
-                      },
+            ) {
+              return {
+                membership:
+                  await tx.membership.findUnique({
+                    where: {
+                      id:
+                        existing.id
+                    },
 
-                      include: {
-                        circle: true,
-                        payoutDate: true
-                      }
-                    }),
+                    include: {
+                      circle: true,
+                      payoutDate: true
+                    }
+                  }),
 
-                  circle,
+                circle,
 
-                  scheduleCreated:
-                    false
-                };
-              }
+                scheduleCreated:
+                  false
+              };
+            }
 
-              if (
-                activeMemberCount >=
-                circle.capacity
-              ) {
-                throw new Error(
-                  "Circle is full"
-                );
-              }
+            /*
+              Do not allow a new/rejoined member
+              beyond the capacity.
+            */
+            if (
+              activeMemberCount >=
+              circle.capacity
+            ) {
+              throw new Error(
+                "Circle is full"
+              );
+            }
 
-              const rejoined =
+            let membership;
+
+            if (existing) {
+              membership =
                 await tx.membership.update({
                   where: {
                     id:
@@ -1766,143 +2325,44 @@ app.post(
                     payoutDate: true
                   }
                 });
+            } else {
+              membership =
+                await tx.membership.create({
+                  data: {
+                    userId:
+                      req.user.id,
 
-              const memberCount =
-                activeMemberCount + 1;
+                    circleId,
 
-              let scheduleCreated =
-                false;
+                    payoutDateId:
+                      null,
 
-              let updatedCircle =
-                circle;
+                    status:
+                      "PAYMENT_PENDING"
+                  },
 
-              if (
-                memberCount >=
-                circle.capacity
-              ) {
-                const existingDates =
-                  await tx.payoutDate.count({
-                    where: {
-                      circleId
-                    }
-                  });
-
-                if (
-                  existingDates === 0
-                ) {
-                  const firstPayoutDate =
-                    new Date();
-
-                  firstPayoutDate.setDate(
-                    firstPayoutDate.getDate() +
-                      7
-                  );
-
-                  firstPayoutDate.setHours(
-                    12,
-                    0,
-                    0,
-                    0
-                  );
-
-                  for (
-                    let i = 0;
-                    i < circle.capacity;
-                    i++
-                  ) {
-                    const payoutAt =
-                      new Date(
-                        firstPayoutDate
-                      );
-
-                    payoutAt.setDate(
-                      payoutAt.getDate() +
-                        i * 7
-                    );
-
-                    await tx.payoutDate.create({
-                      data: {
-                        circleId,
-
-                        payoutAt,
-
-                        capacity: 1,
-
-                        reserved: 0
-                      }
-                    });
+                  include: {
+                    circle: true,
+                    payoutDate: true
                   }
-                }
-
-                updatedCircle =
-                  await tx.circle.update({
-                    where: {
-                      id:
-                        circle.id
-                    },
-
-                    data: {
-                      status:
-                        "READY"
-                    }
-                  });
-
-                scheduleCreated =
-                  true;
-              }
-
-              return {
-                membership:
-                  rejoined,
-
-                circle:
-                  updatedCircle,
-
-                scheduleCreated
-              };
+                });
             }
-
-            if (
-              activeMemberCount >=
-              circle.capacity
-            ) {
-              throw new Error(
-                "Circle is full"
-              );
-            }
-
-            const membership =
-              await tx.membership.create({
-                data: {
-                  userId:
-                    req.user.id,
-
-                  circleId,
-
-                  payoutDateId:
-                    null,
-
-                  status:
-                    "PAYMENT_PENDING"
-                },
-
-                include: {
-                  circle: true,
-                  payoutDate: true
-                }
-              });
 
             const memberCount =
               activeMemberCount + 1;
 
-            let scheduleCreated =
-              false;
-
             let updatedCircle =
               circle;
 
+            let scheduleCreated =
+              false;
+
+            /*
+              Only create the weekly payout
+              schedule when the circle becomes full.
+            */
             if (
-              memberCount >=
+              memberCount ===
               circle.capacity
             ) {
               const existingDates =
@@ -2101,12 +2561,6 @@ app.post(
               );
             }
 
-            /*
-              A payout week can only be selected
-              after the member has completed
-              their contribution.
-            */
-
             if (
               membership.status !==
               "PAID"
@@ -2116,18 +2570,65 @@ app.post(
               );
             }
 
-            /*
-              The circle must already be full
-              and the weekly schedule must
-              have been created.
-            */
-
             if (
               membership.circle.status !==
               "READY"
             ) {
               throw new Error(
                 "The payout schedule is not ready yet. Your circle must be full first."
+              );
+            }
+
+            /*
+              Make sure the entire circle has
+              actually been funded before payout
+              selection is finalized.
+            */
+            const activeMemberCount =
+              await tx.membership.count({
+                where: {
+                  circleId:
+                    membership.circleId,
+
+                  status: {
+                    not: "CANCELLED"
+                  }
+                }
+              });
+
+            const paidMemberCount =
+              await tx.membership.count({
+                where: {
+                  circleId:
+                    membership.circleId,
+
+                  status:
+                    "PAID"
+                }
+              });
+
+            if (
+              activeMemberCount !==
+                membership.circle.capacity ||
+              paidMemberCount !==
+                membership.circle.capacity
+            ) {
+              throw new Error(
+                "Your circle is full, but all contributions have not been confirmed yet."
+              );
+            }
+
+            /*
+              Once a payout has started, changing
+              the payout week is no longer allowed.
+            */
+            if (
+              membership.payout &&
+              membership.payout.status !==
+                "SCHEDULED"
+            ) {
+              throw new Error(
+                "Your payout has already started processing and its payout week can no longer be changed."
               );
             }
 
@@ -2151,11 +2652,6 @@ app.post(
               throw error;
             }
 
-            /*
-              Make absolutely sure the selected
-              week belongs to this circle.
-            */
-
             if (
               payoutDate.circleId !==
               membership.circleId
@@ -2166,10 +2662,17 @@ app.post(
             }
 
             /*
-              If the member clicks the week they
-              already have, simply return the
-              current membership.
+              Do not allow selection of a payout
+              date that has already passed.
             */
+            if (
+              payoutDate.payoutAt <=
+              new Date()
+            ) {
+              throw new Error(
+                "That payout week has already passed. Please choose a future week."
+              );
+            }
 
             if (
               membership.payoutDateId ===
@@ -2180,11 +2683,7 @@ app.post(
 
             /*
               Reserve the new week atomically.
-              This prevents two members from
-              successfully selecting the same
-              available week at the same time.
             */
-
             const reserved =
               await tx.payoutDate.updateMany({
                 where: {
@@ -2213,11 +2712,8 @@ app.post(
             }
 
             /*
-              Release the member's previous week
-              only after the new week has been
-              successfully reserved.
+              Release the previous week.
             */
-
             if (
               membership.payoutDateId
             ) {
@@ -2238,10 +2734,6 @@ app.post(
                 }
               });
             }
-
-            /*
-              Save the new payout week.
-            */
 
             const updated =
               await tx.membership.update({
@@ -2267,15 +2759,15 @@ app.post(
               });
 
             /*
-              If a payout record already exists,
-              move that payout record to the newly
-              selected week.
+              If a scheduled payout exists,
+              update its date.
 
-              If one does not exist and the member
-              has a PayPal email, create it.
+              It is safe here because we already
+              rejected PROCESSING/COMPLETED/etc.
             */
-
-            if (updated.payout) {
+            if (
+              updated.payout
+            ) {
               await tx.payout.update({
                 where: {
                   id:
@@ -2294,48 +2786,26 @@ app.post(
         );
 
       /*
-        If the member has selected a payout week
-        but no payout record exists yet, create it
-        after the transaction completes.
-
-        This is intentionally separate because
-        createPayoutForMembership() uses the main
-        Prisma client rather than the transaction
-        client.
+        Create payout record after the transaction.
       */
-
       let finalMembership =
         result;
 
       if (
-        result.status === "PAID" &&
+        result.status ===
+          "PAID" &&
         result.payoutDateId
       ) {
         try {
-          const existingPayout =
-            await prisma.payout.findUnique({
-              where: {
-                membershipId:
-                  result.id
-              }
-            });
-
-          if (!existingPayout) {
-            await createPayoutForMembership(
-              result.id
-            );
-          }
+          await createPayoutForMembership(
+            result.id
+          );
         } catch (error) {
           console.error(
             "Unable to create payout after week selection:",
             error
           );
         }
-
-        /*
-          Reload the membership so the frontend
-          receives the latest payout information.
-        */
 
         finalMembership =
           await prisma.membership.findUnique({
@@ -2479,6 +2949,35 @@ app.post(
         });
       }
 
+      /*
+        Reuse an existing active PayPal order
+        instead of creating unnecessary duplicate
+        orders when the user taps Pay repeatedly.
+      */
+      const existingPayment =
+        await prisma.payment.findFirst({
+          where: {
+            membershipId:
+              membership.id,
+
+            status: {
+              in: [
+                "CREATED",
+                "APPROVED"
+              ]
+            },
+
+            paypalOrderId: {
+              not: null
+            }
+          },
+
+          orderBy: {
+            createdAt:
+              "desc"
+          }
+        });
+
       const bankerFeeBps =
         await getBankerFeeBps();
 
@@ -2492,66 +2991,111 @@ app.post(
           bankerFeeBps
         );
 
-      const amount =
-        (
-          circle.amountCents /
-          100
-        ).toFixed(2);
+      /*
+        If an active local PayPal order exists,
+        check it before creating another one.
+      */
+      if (
+        existingPayment?.paypalOrderId
+      ) {
+        try {
+          const existingOrder =
+            await paypalRequest(
+              `/v2/checkout/orders/${encodeURIComponent(
+                existingPayment.paypalOrderId
+              )}`,
+              {
+                method: "GET"
+              }
+            );
 
-      const order =
-        await paypalRequest(
-          "/v2/checkout/orders",
-          {
-            method: "POST",
+          if (
+            existingOrder.status !==
+            "COMPLETED" &&
+            existingOrder.status !==
+            "VOIDED"
+          ) {
+            const approvalUrl =
+              existingOrder.links?.find(
+                (link) =>
+                  link.rel ===
+                    "approve" ||
+                  link.rel ===
+                    "payer-action"
+              )?.href ||
+              null;
 
-            headers: {
-              Prefer:
-                "return=representation"
+            return res.json({
+              orderId:
+                existingPayment.paypalOrderId,
+
+              paymentId:
+                existingPayment.id,
+
+              approvalUrl,
+
+              bankerFeeBps,
+
+              bankerFeePercent:
+                bankerFeeBps / 100,
+
+              estimatedGrossPayout:
+                payout.grossAmountCents,
+
+              estimatedBankerFee:
+                payout.bankerFeeCents,
+
+              estimatedNetPayout:
+                payout.netAmountCents
+            });
+          }
+
+          await prisma.payment.update({
+            where: {
+              id:
+                existingPayment.id
             },
 
-            body:
-              JSON.stringify({
-                intent:
-                  "CAPTURE",
+            data: {
+              status:
+                "FAILED"
+            }
+          });
+        } catch {
+          /*
+            If the old order cannot be retrieved,
+            allow creation of a new attempt.
+          */
 
-                purchase_units: [
-                  {
-                    reference_id:
-                      circle.id,
+          await prisma.payment.updateMany({
+            where: {
+              id:
+                existingPayment.id,
 
-                    description:
-                      `PayaCircle contribution - ${circle.code}`,
+              status: {
+                in: [
+                  "CREATED",
+                  "APPROVED"
+                ]
+              }
+            },
 
-                    amount: {
-                      currency_code:
-                        "USD",
+            data: {
+              status:
+                "FAILED"
+            }
+          });
+        }
+      }
 
-                      value:
-                        amount
-                    }
-                  }
-                ],
+      /*
+        Create the local payment record FIRST.
 
-                application_context: {
-                  brand_name:
-                    "PayaCircle",
-
-                  landing_page:
-                    "LOGIN",
-
-                  user_action:
-                    "PAY_NOW",
-
-                  return_url:
-                    `${APP_URL}/?paypal=success`,
-
-                  cancel_url:
-                    `${APP_URL}/?paypal=cancel`
-                }
-              })
-          }
-        );
-
+        This gives us a permanent idempotency key
+        that can be reused if Railway crashes
+        after PayPal accepts the order but before
+        our database update completes.
+      */
       const payment =
         await prisma.payment.create({
           data: {
@@ -2565,7 +3109,7 @@ app.post(
               membership.id,
 
             paypalOrderId:
-              order.id,
+              null,
 
             amountCents:
               circle.amountCents,
@@ -2575,37 +3119,135 @@ app.post(
           }
         });
 
-      res.json({
-        orderId:
-          order.id,
+      const amount =
+        (
+          circle.amountCents /
+          100
+        ).toFixed(2);
 
-        paymentId:
-          payment.id,
+      try {
+        const order =
+          await paypalRequest(
+            "/v2/checkout/orders",
+            {
+              method: "POST",
 
-        approvalUrl:
-          order.links?.find(
-            (link) =>
-              link.rel ===
-                "approve" ||
-              link.rel ===
-                "payer-action"
-          )?.href ||
-          null,
+              headers: {
+                Prefer:
+                  "return=representation",
 
-        bankerFeeBps,
+                "PayPal-Request-Id":
+                  `PAYACIRCLE-ORDER-${payment.id}`
+              },
 
-        bankerFeePercent:
-          bankerFeeBps / 100,
+              body:
+                JSON.stringify({
+                  intent:
+                    "CAPTURE",
 
-        estimatedGrossPayout:
-          payout.grossAmountCents,
+                  purchase_units: [
+                    {
+                      reference_id:
+                        circle.id,
 
-        estimatedBankerFee:
-          payout.bankerFeeCents,
+                      description:
+                        `PayaCircle contribution - ${circle.code}`,
 
-        estimatedNetPayout:
-          payout.netAmountCents
-      });
+                      amount: {
+                        currency_code:
+                          "USD",
+
+                        value:
+                          amount
+                      }
+                    }
+                  ],
+
+                  application_context: {
+                    brand_name:
+                      "PayaCircle",
+
+                    landing_page:
+                      "LOGIN",
+
+                    user_action:
+                      "PAY_NOW",
+
+                    return_url:
+                      `${APP_URL}/?paypal=success`,
+
+                    cancel_url:
+                      `${APP_URL}/?paypal=cancel`
+                  }
+                })
+            }
+          );
+
+        const savedPayment =
+          await prisma.payment.update({
+            where: {
+              id:
+                payment.id
+            },
+
+            data: {
+              paypalOrderId:
+                order.id,
+
+              status:
+                "CREATED"
+            }
+          });
+
+        res.json({
+          orderId:
+            order.id,
+
+          paymentId:
+            savedPayment.id,
+
+          approvalUrl:
+            order.links?.find(
+              (link) =>
+                link.rel ===
+                  "approve" ||
+                link.rel ===
+                  "payer-action"
+            )?.href ||
+            null,
+
+          bankerFeeBps,
+
+          bankerFeePercent:
+            bankerFeeBps / 100,
+
+          estimatedGrossPayout:
+            payout.grossAmountCents,
+
+          estimatedBankerFee:
+            payout.bankerFeeCents,
+
+          estimatedNetPayout:
+            payout.netAmountCents
+        });
+      } catch (error) {
+        await prisma.payment.updateMany({
+          where: {
+            id:
+              payment.id,
+
+            status:
+              "CREATED"
+          },
+
+          data: {
+            status:
+              "FAILED"
+          }
+        });
+
+        throw error;
+      }
     } catch (error) {
       console.error(
         "PayPal create order error:",
@@ -2722,7 +3364,10 @@ app.post(
 
               headers: {
                 Prefer:
-                  "return=representation"
+                  "return=representation",
+
+                "PayPal-Request-Id":
+                  `PAYACIRCLE-CAPTURE-${payment.id}`
               },
 
               body: "{}"
@@ -2792,9 +3437,27 @@ app.post(
             )
           : null;
 
+      /*
+        Safely finalize the payment.
+      */
       const updatedPayment =
         await prisma.$transaction(
           async (tx) => {
+            const current =
+              await tx.payment.findUnique({
+                where: {
+                  id:
+                    payment.id
+                }
+              });
+
+            if (
+              current?.status ===
+              "CAPTURED"
+            ) {
+              return current;
+            }
+
             const updated =
               await tx.payment.update({
                 where: {
@@ -2834,29 +3497,53 @@ app.post(
         );
 
       /*
-        Payment is now confirmed.
-
-        If the member already selected a payout
-        week and has a PayPal email, create the
-        scheduled payout record.
+        Now that this member is paid, see if
+        the entire circle is funded and create
+        any eligible payout records.
       */
-
-      let payout = null;
-
       if (
         payment.membershipId
       ) {
         try {
-          payout =
-            await createPayoutForMembership(
-              payment.membershipId
+          const paidMembership =
+            await prisma.membership.findUnique({
+              where: {
+                id:
+                  payment.membershipId
+              },
+
+              select: {
+                circleId: true
+              }
+            });
+
+          if (
+            paidMembership
+          ) {
+            await ensurePayoutsForFullyPaidCircle(
+              paidMembership.circleId
             );
+          }
         } catch (error) {
           console.error(
             "Payout record creation error:",
             error
           );
         }
+      }
+
+      let payout = null;
+
+      if (
+        payment.membershipId
+      ) {
+        payout =
+          await prisma.payout.findUnique({
+            where: {
+              membershipId:
+                payment.membershipId
+            }
+          });
       }
 
       res.json({
@@ -2876,30 +3563,46 @@ app.post(
         error
       );
 
-      try {
-        await prisma.payment.updateMany({
-          where: {
-            paypalOrderId:
-              parsed.data.orderId,
+      /*
+        Do not mark the payment FAILED for
+        transient PayPal/network errors.
 
-            userId:
-              req.user.id,
+        Only definitive 4xx errors are treated
+        as failed.
+      */
+      const status =
+        Number(error?.status || 0);
 
-            status: {
-              in: [
-                "CREATED",
-                "APPROVED"
-              ]
+      if (
+        status >= 400 &&
+        status < 500 &&
+        status !== 409
+      ) {
+        try {
+          await prisma.payment.updateMany({
+            where: {
+              paypalOrderId:
+                parsed.data.orderId,
+
+              userId:
+                req.user.id,
+
+              status: {
+                in: [
+                  "CREATED",
+                  "APPROVED"
+                ]
+              }
+            },
+
+            data: {
+              status:
+                "FAILED"
             }
-          },
-
-          data: {
-            status:
-              "FAILED"
-          }
-        });
-      } catch {
-        // Ignore secondary update error.
+          });
+        } catch {
+          // Ignore secondary update error.
+        }
       }
 
       res.status(
@@ -2931,7 +3634,8 @@ app.post(
         });
       }
 
-      const rawBody = req.rawBody;
+      const rawBody =
+        req.rawBody;
 
       if (!rawBody) {
         console.error(
@@ -2944,19 +3648,29 @@ app.post(
       }
 
       const transmissionId =
-        req.headers["paypal-transmission-id"];
+        req.headers[
+          "paypal-transmission-id"
+        ];
 
       const transmissionTime =
-        req.headers["paypal-transmission-time"];
+        req.headers[
+          "paypal-transmission-time"
+        ];
 
       const transmissionSig =
-        req.headers["paypal-transmission-sig"];
+        req.headers[
+          "paypal-transmission-sig"
+        ];
 
       const certUrl =
-        req.headers["paypal-cert-url"];
+        req.headers[
+          "paypal-cert-url"
+        ];
 
       const authAlgo =
-        req.headers["paypal-auth-algo"];
+        req.headers[
+          "paypal-auth-algo"
+        ];
 
       if (
         !transmissionId ||
@@ -2977,10 +3691,13 @@ app.post(
       let event;
 
       try {
-        event = JSON.parse(
-          rawBody.toString("utf8")
-        );
-      } catch (error) {
+        event =
+          JSON.parse(
+            rawBody.toString(
+              "utf8"
+            )
+          );
+      } catch {
         console.error(
           "PayPal webhook rejected: invalid JSON."
         );
@@ -2994,35 +3711,35 @@ app.post(
         Verify the webhook with PayPal before
         processing any payout information.
       */
-
       const verificationResponse =
         await paypalRequest(
           "/v1/notifications/verify-webhook-signature",
           {
             method: "POST",
 
-            body: JSON.stringify({
-  auth_algo:
-    authAlgo,
+            body:
+              JSON.stringify({
+                auth_algo:
+                  authAlgo,
 
-  cert_url:
-    certUrl,
+                cert_url:
+                  certUrl,
 
-  transmission_id:
-    transmissionId,
+                transmission_id:
+                  transmissionId,
 
-  transmission_sig:
-    transmissionSig,
+                transmission_sig:
+                  transmissionSig,
 
-  transmission_time:
-    transmissionTime,
+                transmission_time:
+                  transmissionTime,
 
-  webhook_id:
-    PAYPAL_WEBHOOK_ID,
+                webhook_id:
+                  PAYPAL_WEBHOOK_ID,
 
-  webhook_event:
-    event
-})
+                webhook_event:
+                  event
+              })
           }
         );
 
@@ -3049,11 +3766,6 @@ app.post(
         event?.id || ""
       );
 
-      /*
-        Only process payout events after
-        PayPal signature verification succeeds.
-      */
-
       const resource =
         event?.resource || {};
 
@@ -3076,10 +3788,8 @@ app.post(
       let payout = null;
 
       /*
-        Match our payout using our own payout
-        database ID first, then PayPal IDs.
+        Match using our own payout ID first.
       */
-
       if (senderItemId) {
         payout =
           await prisma.payout.findUnique({
@@ -3117,11 +3827,10 @@ app.post(
       }
 
       /*
-        A verified PayPal event may legitimately
-        refer to a payout that is not in our
-        database. Acknowledge it without failure.
+        Verified but unmatched events should still
+        receive HTTP 200 so PayPal does not endlessly
+        retry a legitimate event unrelated to us.
       */
-
       if (!payout) {
         console.log(
           "Verified PayPal webhook received with no matching payout:",
@@ -3133,37 +3842,35 @@ app.post(
         });
       }
 
-      let status = null;
+      const paypalStatus =
+        resource?.transaction_status ||
+        resource?.payout_item
+          ?.transaction_status ||
+        resource?.status ||
+        null;
 
-      if (
-        eventType.includes(
-          "SUCCEEDED"
-        )
-      ) {
-        status =
-          "COMPLETED";
-      }
+      const mappedStatus =
+        payoutStatusFromPayPalStatus(
+          paypalStatus
+        );
 
-      if (
-        eventType.includes(
-          "FAILED"
-        ) ||
-        eventType.includes(
-          "RETURNED"
-        ) ||
-        eventType.includes(
-          "BLOCKED"
-        ) ||
-        eventType.includes(
-          "CANCELED"
-        ) ||
-        eventType.includes(
-          "CANCELLED"
+      const feeValue =
+        resource?.payout_item_fee
+          ?.value ||
+        resource?.payout_item
+          ?.payout_item_fee
+          ?.value;
+
+      const paypalFeeCents =
+        feeValue !== undefined &&
+        feeValue !== null &&
+        Number.isFinite(
+          Number(feeValue)
         )
-      ) {
-        status =
-          "FAILED";
-      }
+          ? Math.round(
+              Number(feeValue) * 100
+            )
+          : payout.paypalFeeCents;
 
       const updateData = {
         paypalItemId:
@@ -3172,29 +3879,75 @@ app.post(
 
         paypalBatchId:
           payoutBatchId ||
-          payout.paypalBatchId
+          payout.paypalBatchId,
+
+        paypalFeeCents
       };
 
-      if (status) {
-        updateData.status =
-          status;
+      /*
+        Do not allow an old FAILED event to
+        overwrite a completed payout.
+
+        Do allow RETURNED/REFUNDED to change
+        a previously completed payout.
+      */
+      if (mappedStatus) {
+        if (
+          payout.status ===
+            "COMPLETED" &&
+          mappedStatus ===
+            "FAILED"
+        ) {
+          console.log(
+            `Ignoring stale failed webhook for completed payout ${payout.id}`
+          );
+        } else if (
+          payout.status ===
+            "RETURNED" &&
+          mappedStatus ===
+            "COMPLETED"
+        ) {
+          console.log(
+            `Ignoring stale success webhook for returned payout ${payout.id}`
+          );
+        } else {
+          updateData.status =
+            mappedStatus;
+        }
       }
 
-      await prisma.payout.update({
-        where: {
-          id:
-            payout.id
-        },
+      const updated =
+        await prisma.payout.update({
+          where: {
+            id:
+              payout.id
+          },
 
-        data:
-          updateData
-      });
+          data:
+            updateData
+        });
+
+      if (
+        updated.status ===
+        "COMPLETED"
+      ) {
+        await prisma.membership.updateMany({
+          where: {
+            id:
+              updated.membershipId
+          },
+
+          data: {
+            status:
+              "PAID_OUT"
+          }
+        });
+      }
 
       console.log(
         "PayPal payout updated:",
         payout.id,
-        status ||
-          "NO_STATUS_CHANGE"
+        updated.status
       );
 
       return res.json({
@@ -3210,7 +3963,6 @@ app.post(
         Return 500 for unexpected local errors
         so PayPal can retry the webhook.
       */
-
       return res.status(500).json({
         received: false
       });
@@ -3437,18 +4189,17 @@ async function startServer() {
         );
 
         /*
-          Check for due payouts every minute.
+          Check for due and recovering payouts
+          every minute.
         */
-
         setInterval(
           processDuePayouts,
           60 * 1000
         );
 
         /*
-          Also check shortly after startup.
+          Check shortly after startup.
         */
-
         setTimeout(
           processDuePayouts,
           5000
