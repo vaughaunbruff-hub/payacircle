@@ -164,6 +164,20 @@ function setupAuthModal() {
       closeAuthModal
     );
   });
+
+  $("#closeAuthModal")?.addEventListener(
+    "click",
+    closeAuthModal
+  );
+
+  $("#authModal")?.addEventListener(
+    "click",
+    (event) => {
+      if (event.target === $("#authModal")) {
+        closeAuthModal();
+      }
+    }
+  );
 }
 
 /* --------------------------------
@@ -211,7 +225,10 @@ async function registerUser(event) {
     showDashboard();
 
     alert(
-      `Welcome to PayaCircle, ${user.name.split(" ")[0]}!`
+      `Welcome to PayaCircle, ${
+        user.name?.trim().split(/\s+/)[0] ||
+        "Member"
+      }!`
     );
   } catch (error) {
     if (message) {
@@ -350,6 +367,15 @@ function renderUserInformation(user) {
     }
   });
 
+  const initials =
+    firstName.charAt(0).toUpperCase();
+
+  $$(".dashboardUserInitials")
+    .forEach((element) => {
+      element.textContent =
+        initials || "M";
+    });
+
   const welcome =
     $("#dashboardWelcomeName");
 
@@ -419,11 +445,6 @@ function setupProfileMenu() {
     );
   }
 
-  /*
-    Mobile M button:
-    Open the same account menu instead
-    of immediately opening Profile.
-  */
   const mobileProfile =
     $("#mobileProfileButton");
 
@@ -551,11 +572,20 @@ function setupAccountNavigation() {
 
 function membershipStatusLabel(status) {
   const labels = {
+    RESERVED:
+      "Reserved",
+
     PAYMENT_PENDING:
       "Payment Pending",
 
     PAID:
       "Paid",
+
+    PAYOUT_SCHEDULED:
+      "Payout Scheduled",
+
+    PAID_OUT:
+      "Paid Out",
 
     CANCELLED:
       "Cancelled",
@@ -568,6 +598,15 @@ function membershipStatusLabel(status) {
     labels[status] ||
     status ||
     "Unknown"
+  );
+}
+
+function membershipNeedsPayoutSelection(
+  membership
+) {
+  return (
+    membership?.status === "PAID" &&
+    !membership?.payoutDate
   );
 }
 
@@ -613,6 +652,11 @@ function renderMemberships(
 
           const status =
             membership.status;
+
+          const needsPayoutSelection =
+            membershipNeedsPayoutSelection(
+              membership
+            );
 
           card.innerHTML = `
             <div class="circle-card-content">
@@ -666,6 +710,23 @@ function renderMemberships(
                   : ""
               }
 
+              ${
+                needsPayoutSelection
+                  ? `
+                    <div class="payout-selection-notice">
+                      <strong>
+                        Your circle is full!
+                      </strong>
+
+                      <p>
+                        Your weekly payout schedule is ready.
+                        Choose your preferred payout week.
+                      </p>
+                    </div>
+                  `
+                  : ""
+              }
+
               <div class="circle-card-actions">
                 <button
                   class="ghost view-circle-button"
@@ -696,12 +757,30 @@ function renderMemberships(
                 }
 
                 ${
+                  needsPayoutSelection
+                    ? `
+                      <button
+                        class="primary choose-payout-button"
+                        data-membership-id="${escapeHTML(
+                          membership.id
+                        )}"
+                        data-circle-id="${escapeHTML(
+                          circle?.id || ""
+                        )}"
+                      >
+                        Choose Payout Week
+                      </button>
+                    `
+                    : ""
+                }
+
+                ${
                   status !==
                     "CANCELLED" &&
                   status !==
                     "REFUNDED" &&
                   status !==
-                    "PAID"
+                    "PAID_OUT"
                     ? `
                       <button
                         class="ghost cancel-membership-button"
@@ -769,6 +848,30 @@ function renderMemberships(
       );
     });
 
+  $$(".choose-payout-button")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        async () => {
+          const membership =
+            memberships.find(
+              (item) =>
+                item.id ===
+                button.dataset
+                  .membershipId
+            );
+
+          if (!membership) {
+            return;
+          }
+
+          await choosePayoutWeek(
+            membership
+          );
+        }
+      );
+    });
+
   $$(".cancel-membership-button")
     .forEach((button) => {
       button.addEventListener(
@@ -781,6 +884,142 @@ function renderMemberships(
         }
       );
     });
+}
+
+/* --------------------------------
+   PAYOUT WEEK SELECTION
+--------------------------------- */
+
+async function choosePayoutWeek(
+  membership
+) {
+  if (!membership?.id) {
+    alert(
+      "We could not find your membership."
+    );
+
+    return;
+  }
+
+  const circle =
+    membership.circle;
+
+  if (!circle?.id) {
+    alert(
+      "We could not find your circle."
+    );
+
+    return;
+  }
+
+  try {
+    const dates =
+      await api(
+        `/circles/${encodeURIComponent(
+          circle.id
+        )}/dates`
+      );
+
+    const availableDates =
+      (dates || []).filter(
+        (date) =>
+          Number(
+            date.reserved || 0
+          ) <
+          Number(
+            date.capacity || 1
+          )
+      );
+
+    if (!availableDates.length) {
+      alert(
+        "There are currently no available payout weeks."
+      );
+
+      return;
+    }
+
+    const options =
+      availableDates
+        .map(
+          (date, index) =>
+            `${index + 1}. ${formatDate(
+              date.payoutAt
+            )}`
+        )
+        .join("\n");
+
+    const selectedNumber =
+      prompt(
+        `Your Circle is now full!\n\n` +
+        `Your weekly payout schedule has been created.\n\n` +
+        `Choose your preferred payout week:\n\n` +
+        `${options}\n\n` +
+        `Enter the number of your preferred week:`
+      );
+
+    if (!selectedNumber) {
+      return;
+    }
+
+    const selectedIndex =
+      Number(selectedNumber) - 1;
+
+    if (
+      !Number.isInteger(
+        selectedIndex
+      ) ||
+      selectedIndex < 0 ||
+      selectedIndex >=
+        availableDates.length
+    ) {
+      alert(
+        "Please choose a valid payout week."
+      );
+
+      return;
+    }
+
+    const selectedDate =
+      availableDates[
+        selectedIndex
+      ];
+
+    const updatedMembership =
+      await api(
+        `/memberships/${encodeURIComponent(
+          membership.id
+        )}/payout-date`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            payoutDateId:
+              selectedDate.id
+          })
+        }
+      );
+
+    selectedMembership =
+      updatedMembership;
+
+    alert(
+      `Your payout week has been scheduled for ${formatDate(
+        selectedDate.payoutAt
+      )}.`
+    );
+
+    await loadAccount();
+  } catch (error) {
+    console.error(
+      "Payout selection error:",
+      error
+    );
+
+    alert(
+      error.message ||
+        "Unable to select your payout week."
+    );
+  }
 }
 
 /* --------------------------------
@@ -1062,6 +1301,7 @@ async function loadPayouts() {
     );
   }
 }
+
 /* --------------------------------
    PUBLIC CIRCLES
 --------------------------------- */
@@ -1102,7 +1342,8 @@ async function loadPublicCircles() {
                 <h3>
                   ${escapeHTML(
                     circle.name ||
-                      circle.code
+                      circle.code ||
+                      "PayaCircle"
                   )}
                 </h3>
 
@@ -1297,91 +1538,122 @@ function closeCircleDetails() {
    JOIN CIRCLE
 --------------------------------- */
 
-async function openJoinCircle(circle) {
+async function openJoinCircle(
+  circle
+) {
+  if (!circle?.id) {
+    alert(
+      "We could not find this circle."
+    );
+
+    return;
+  }
+
   try {
-    const dates = await api(
-      `/circles/${encodeURIComponent(circle.id)}/dates`
-    );
-
-    const availableDates = dates.filter(
-      (date) =>
-        Number(date.reserved || 0) <
-        Number(date.capacity || 1)
-    );
-
-    if (!availableDates.length) {
-      alert(
-        "There are no available payout weeks for this circle."
+    const confirmed =
+      confirm(
+        `Join ${
+          circle.name ||
+          circle.code ||
+          "this circle"
+        } for ${money(
+          circle.amountCents
+        )}?`
       );
-
-      return;
-    }
-
-    const confirmed = confirm(
-      `Join ${circle.name || circle.code} for ${money(
-        circle.amountCents
-      )}?`
-    );
 
     if (!confirmed) {
       return;
     }
 
-    const payoutOptions = availableDates
-      .map(
-        (date, index) =>
-          `${index + 1}. ${formatDate(date.payoutAt)}`
-      )
-      .join("\n");
+    /*
+      IMPORTANT:
+      Do not choose a payout date here.
 
-    const selectedNumber = prompt(
-      `Choose your preferred payout week.\n\n` +
-        payoutOptions +
-        `\n\nEnter the number of your preferred week:`
-    );
+      Payout dates are created by the
+      backend only when the circle
+      becomes full.
+    */
 
-    if (!selectedNumber) {
-      return;
-    }
+    const membership =
+      await api(
+        "/memberships",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            circleId:
+              circle.id
+          })
+        }
+      );
 
-    const selectedIndex =
-      Number(selectedNumber) - 1;
+    selectedCircle =
+      circle;
+
+    selectedMembership =
+      membership;
+
+    await loadAccount();
+
+    /*
+      If the circle became full and
+      the backend created the payout
+      schedule, the user can now
+      choose a payout week.
+    */
+
+    const refreshedUser =
+      await getCurrentUser();
+
+    const refreshedMembership =
+      refreshedUser?.memberships?.find(
+        (item) =>
+          item.id ===
+          membership.id
+      );
 
     if (
-      !Number.isInteger(selectedIndex) ||
-      selectedIndex < 0 ||
-      selectedIndex >= availableDates.length
+      refreshedMembership &&
+      membershipNeedsPayoutSelection(
+        refreshedMembership
+      )
     ) {
-      alert(
-        "Please choose a valid payout week."
+      await choosePayoutWeek(
+        refreshedMembership
       );
 
       return;
     }
 
-    const selectedDate =
-      availableDates[selectedIndex];
+    /*
+      Normal case:
+      membership is payment-pending,
+      so show the PayPal payment panel.
+    */
 
-    const membership = await api(
-      "/memberships",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          circleId: circle.id,
-          payoutDateId: selectedDate.id
-        })
-      }
-    );
+    const paymentMembership =
+      refreshedMembership ||
+      membership;
 
-    selectedCircle = circle;
-    selectedMembership = membership;
+    selectedMembership =
+      paymentMembership;
 
-    await loadAccount();
+    selectedCircle =
+      paymentMembership.circle ||
+      circle;
 
-    await openPaymentPanel(
-      circle,
-      membership
-    );
+    if (
+      paymentMembership.status ===
+      "PAYMENT_PENDING"
+    ) {
+      await openPaymentPanel(
+        selectedCircle,
+        paymentMembership
+      );
+    } else {
+      alert(
+        "You have successfully joined the circle."
+      );
+    }
   } catch (error) {
     alert(error.message);
   }
@@ -1488,15 +1760,6 @@ async function createCircle(
 
     await loadAccount();
 
-    /*
-      The creator is automatically
-      added to the circle by the
-      backend with PAYMENT_PENDING.
-
-      Immediately show the payment
-      panel so they can pay.
-    */
-
     if (
       result.membership
     ) {
@@ -1518,6 +1781,11 @@ async function createCircle(
     }
   }
 }
+
+/* --------------------------------
+   PAYMENT PANEL
+--------------------------------- */
+
 async function openPaymentPanel(
   circle,
   membership
@@ -1530,10 +1798,14 @@ async function openPaymentPanel(
     return;
   }
 
-  selectedCircle = circle;
-  selectedMembership = membership || null;
+  selectedCircle =
+    circle;
 
-  const panel = $("#paymentPanel");
+  selectedMembership =
+    membership || null;
+
+  const panel =
+    $("#paymentPanel");
 
   if (!panel) {
     alert(
@@ -1550,7 +1822,8 @@ async function openPaymentPanel(
     membership
   );
 
-  const button = $("#paypalButton");
+  const button =
+    $("#paypalButton");
 
   if (button) {
     button.disabled = false;
@@ -1558,9 +1831,7 @@ async function openPaymentPanel(
       "Continue with PayPal";
   }
 }
-/* --------------------------------
-   PAYMENT PANEL
---------------------------------- */
+
 async function renderPaymentDetails(
   circle,
   membership
@@ -1576,6 +1847,15 @@ async function renderPaymentDetails(
     Number(
       circle?.amountCents || 0
     );
+
+  const capacity =
+    Number(
+      circle?.capacity || 1
+    );
+
+  const grossPayoutCents =
+    contributionCents *
+    capacity;
 
   let bankerFeeBps = 700;
 
@@ -1609,7 +1889,7 @@ async function renderPaymentDetails(
 
   const bankerFeeCents =
     Math.round(
-      contributionCents *
+      grossPayoutCents *
         bankerFeeBps /
         10000
     );
@@ -1617,7 +1897,7 @@ async function renderPaymentDetails(
   const payoutAfterFeeCents =
     Math.max(
       0,
-      contributionCents -
+      grossPayoutCents -
         bankerFeeCents
     );
 
@@ -1634,10 +1914,30 @@ async function renderPaymentDetails(
     </div>
 
     <div class="payment-detail-row">
-      <span>Contribution</span>
+      <span>Your Contribution</span>
       <strong>
         ${money(
           contributionCents
+        )}
+      </strong>
+    </div>
+
+    <div class="payment-detail-row">
+      <span>Circle Size</span>
+      <strong>
+        ${capacity} member${
+          capacity === 1
+            ? ""
+            : "s"
+        }
+      </strong>
+    </div>
+
+    <div class="payment-detail-row">
+      <span>Scheduled Gross Payout</span>
+      <strong>
+        ${money(
+          grossPayoutCents
         )}
       </strong>
     </div>
@@ -1659,7 +1959,7 @@ async function renderPaymentDetails(
     </div>
 
     <div class="payment-detail-row">
-      <span>Amount after Banker Fee</span>
+      <span>Your Payout After Banker Fee</span>
       <strong>
         ${money(
           payoutAfterFeeCents
@@ -1682,7 +1982,7 @@ async function renderPaymentDetails(
       membership?.payoutDate
         ? `
           <div class="payment-detail-row">
-            <span>Payout date</span>
+            <span>Payout Date</span>
             <strong>
               ${formatDate(
                 membership
@@ -1710,6 +2010,16 @@ async function startPayPalPayment() {
     return;
   }
 
+  if (
+    !selectedMembership?.id
+  ) {
+    alert(
+      "Your membership could not be found. Please refresh the page and try again."
+    );
+
+    return;
+  }
+
   const button =
     $("#paypalButton");
 
@@ -1722,15 +2032,11 @@ async function startPayPalPayment() {
   try {
     const payload = {
       circleId:
-        selectedCircle.id
-    };
+        selectedCircle.id,
 
-    if (
-      selectedMembership?.id
-    ) {
-      payload.membershipId =
-        selectedMembership.id;
-    }
+      membershipId:
+        selectedMembership.id
+    };
 
     const result =
       await api(
@@ -1749,12 +2055,6 @@ async function startPayPalPayment() {
       );
     }
 
-    /*
-      Save the order ID before leaving
-      PayaCircle. PayPal will redirect
-      back to our application afterward.
-    */
-
     localStorage.setItem(
       "payacircle_pending_order",
       JSON.stringify({
@@ -1765,8 +2065,7 @@ async function startPayPalPayment() {
           selectedCircle.id,
 
         membershipId:
-          selectedMembership?.id ||
-          null
+          selectedMembership.id
       })
     );
 
@@ -1914,10 +2213,6 @@ async function handlePayPalReturn() {
         "payacircle_pending_order"
       );
 
-      alert(
-        "Payment confirmed! Your PayaCircle membership is now active."
-      );
-
       cleanPayPalUrl();
 
       await loadAccount();
@@ -1925,6 +2220,40 @@ async function handlePayPalReturn() {
       hide(
         $("#paymentPanel")
       );
+
+      alert(
+        "Payment confirmed! Your PayaCircle membership is now active."
+      );
+
+      /*
+        If payment completed and the
+        circle is now full, load the
+        refreshed membership and allow
+        the member to choose a payout week.
+      */
+
+      const refreshedUser =
+        await getCurrentUser();
+
+      const membership =
+        pending?.membershipId
+          ? refreshedUser?.memberships?.find(
+              (item) =>
+                item.id ===
+                pending.membershipId
+            )
+          : null;
+
+      if (
+        membership &&
+        membershipNeedsPayoutSelection(
+          membership
+        )
+      ) {
+        await choosePayoutWeek(
+          membership
+        );
+      }
 
       return;
     }
@@ -2044,6 +2373,19 @@ function setupModals() {
         }
       }
     );
+
+  $("#paymentPanel")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          $("#paymentPanel")
+        ) {
+          cancelPayment();
+        }
+      }
+    );
 }
 
 /* --------------------------------
@@ -2141,12 +2483,6 @@ async function init() {
 
   setupPublicAuthButtons();
 
-  /*
-    Check whether PayPal has returned
-    the user to PayaCircle before
-    loading the normal account state.
-  */
-
   const paypalParams =
     new URLSearchParams(
       window.location.search
@@ -2181,11 +2517,6 @@ async function init() {
   } else {
     showPublicSite();
   }
-
-  /*
-    Load public circles in the
-    background where available.
-  */
 
   loadPublicCircles().catch(
     () => {}
