@@ -23,7 +23,16 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "100kb" }));
+app.use(
+  express.json({
+    limit: "100kb",
+    verify: (req, res, buf) => {
+      if (req.originalUrl === "/api/paypal/webhook") {
+        req.rawBody = Buffer.from(buf);
+      }
+    }
+  })
+);
 app.use(cookieParser());
 
 app.use(
@@ -57,7 +66,8 @@ const PAYPAL_CLIENT_ID =
 
 const PAYPAL_CLIENT_SECRET =
   process.env.PAYPAL_CLIENT_SECRET;
-
+const PAYPAL_WEBHOOK_ID =
+  process.env.PAYPAL_WEBHOOK_ID;
 const DEFAULT_BANKER_FEE_BPS = 700;
 
 /* --------------------------------
