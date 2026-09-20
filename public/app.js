@@ -1518,7 +1518,46 @@ async function createCircle(
     }
   }
 }
+async function openPaymentPanel(
+  circle,
+  membership
+) {
+  if (!circle) {
+    alert(
+      "Please select a circle first."
+    );
 
+    return;
+  }
+
+  selectedCircle = circle;
+  selectedMembership = membership || null;
+
+  const panel = $("#paymentPanel");
+
+  if (!panel) {
+    alert(
+      "Payment panel is unavailable."
+    );
+
+    return;
+  }
+
+  show(panel);
+
+  await renderPaymentDetails(
+    circle,
+    membership
+  );
+
+  const button = $("#paypalButton");
+
+  if (button) {
+    button.disabled = false;
+    button.textContent =
+      "Continue with PayPal";
+  }
+}
 /* --------------------------------
    PAYMENT PANEL
 --------------------------------- */
