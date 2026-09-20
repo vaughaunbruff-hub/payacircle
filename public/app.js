@@ -919,6 +919,10 @@ function openPayoutWeekModal() {
     $("#payoutWeekModal");
 
   if (!modal) {
+    alert(
+      "The payout week selector is unavailable. Please refresh the page."
+    );
+
     return;
   }
 
@@ -973,8 +977,8 @@ function renderPayoutWeekOptions(
         </strong>
 
         <span>
-          All available payout weeks have already been selected.
-          Please check again later.
+          Your payout schedule has not been created yet,
+          or there are no payout weeks available.
         </span>
       </div>
     `;
@@ -990,8 +994,25 @@ function renderPayoutWeekOptions(
         );
 
       button.type = "button";
+
+      const isReserved =
+        Number(
+          date.reserved || 0
+        ) >=
+        Number(
+          date.capacity || 1
+        );
+
       button.className =
         "payout-week-option";
+
+      if (isReserved) {
+        button.classList.add(
+          "payout-week-unavailable"
+        );
+
+        button.disabled = true;
+      }
 
       button.dataset.payoutDateId =
         date.id;
@@ -1029,21 +1050,41 @@ function renderPayoutWeekOptions(
             )}
           </small>
 
+          ${
+            isReserved
+              ? `
+                <em class="payout-week-status">
+                  Already selected
+                </em>
+              `
+              : `
+                <em class="payout-week-status">
+                  Available
+                </em>
+              `
+          }
+
         </span>
 
         <span class="payout-week-arrow">
-          →
+          ${
+            isReserved
+              ? "🔒"
+              : "→"
+          }
         </span>
       `;
 
-      button.addEventListener(
-        "click",
-        () => {
-          selectPayoutWeek(
-            date
-          );
-        }
-      );
+      if (!isReserved) {
+        button.addEventListener(
+          "click",
+          () => {
+            selectPayoutWeek(
+              date
+            );
+          }
+        );
+      }
 
       list.appendChild(
         button
@@ -1128,11 +1169,11 @@ async function choosePayoutWeek(
     list.innerHTML = `
       <div class="payment-processing">
         <strong>
-          Loading available payout weeks...
+          Loading payout schedule...
         </strong>
 
         <p>
-          Please wait.
+          Please wait while we load the available weeks.
         </p>
       </div>
     `;
@@ -1155,19 +1196,8 @@ async function choosePayoutWeek(
         )}/dates`
       );
 
-    const availableDates =
-      (dates || []).filter(
-        (date) =>
-          Number(
-            date.reserved || 0
-          ) <
-          Number(
-            date.capacity || 1
-          )
-      );
-
     renderPayoutWeekOptions(
-      availableDates
+      dates || []
     );
   } catch (error) {
     console.error(
@@ -1176,13 +1206,27 @@ async function choosePayoutWeek(
     );
 
     if (list) {
-      list.innerHTML = "";
+      list.innerHTML = `
+        <div class="empty-state compact">
+          <div class="empty-icon">!</div>
+
+          <strong>
+            Unable to load payout weeks
+          </strong>
+
+          <span>
+            ${escapeHTML(
+              error.message ||
+                "Please try again."
+            )}
+          </span>
+        </div>
+      `;
     }
 
     if (message) {
       message.textContent =
-        error.message ||
-        "Unable to load the payout schedule.";
+        "";
     }
   }
 }
@@ -1204,6 +1248,22 @@ async function selectPayoutWeek(
   if (!payoutDate?.id) {
     alert(
       "That payout week is unavailable."
+    );
+
+    return;
+  }
+
+  const isReserved =
+    Number(
+      payoutDate.reserved || 0
+    ) >=
+    Number(
+      payoutDate.capacity || 1
+    );
+
+  if (isReserved) {
+    alert(
+      "That payout week has already been selected."
     );
 
     return;
@@ -1307,6 +1367,17 @@ function setupPayoutWeekModal() {
         }
       }
     );
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Escape"
+      ) {
+        closePayoutWeekModal();
+      }
+    }
+  );
 }
 
 /* --------------------------------
