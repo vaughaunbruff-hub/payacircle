@@ -3,6 +3,7 @@ const API = "/api";
 let currentUser = null;
 let selectedCircle = null;
 let selectedMembership = null;
+let payoutWeekMembership = null;
 
 /* --------------------------------
    HELPERS
@@ -158,12 +159,14 @@ function setupAuthModal() {
     }
   );
 
-  $$("[data-close-auth]").forEach((button) => {
-    button.addEventListener(
-      "click",
-      closeAuthModal
-    );
-  });
+  $$("[data-close-auth]").forEach(
+    (button) => {
+      button.addEventListener(
+        "click",
+        closeAuthModal
+      );
+    }
+  );
 
   $("#closeAuthModal")?.addEventListener(
     "click",
@@ -343,14 +346,16 @@ function renderUserInformation(user) {
     "#profileName"
   ];
 
-  nameTargets.forEach((selector) => {
-    const element = $(selector);
+  nameTargets.forEach(
+    (selector) => {
+      const element = $(selector);
 
-    if (element) {
-      element.textContent =
-        fullName;
+      if (element) {
+        element.textContent =
+          fullName;
+      }
     }
-  });
+  );
 
   const emailTargets = [
     "#dashboardUserEmail",
@@ -358,14 +363,25 @@ function renderUserInformation(user) {
     "#profileEmail"
   ];
 
-  emailTargets.forEach((selector) => {
-    const element = $(selector);
+  emailTargets.forEach(
+    (selector) => {
+      const element = $(selector);
 
-    if (element) {
-      element.textContent =
-        user.email || "";
+      if (element) {
+        element.textContent =
+          user.email || "";
+      }
     }
-  });
+  );
+
+  const paypalEmail =
+    $("#profilePaypalEmail");
+
+  if (paypalEmail) {
+    paypalEmail.textContent =
+      user.paypalEmail ||
+      "Not provided";
+  }
 
   const initials =
     firstName.charAt(0).toUpperCase();
@@ -482,10 +498,13 @@ async function logout() {
   currentUser = null;
   selectedCircle = null;
   selectedMembership = null;
+  payoutWeekMembership = null;
 
   localStorage.removeItem(
     "payacircle_pending_order"
   );
+
+  closePayoutWeekModal();
 
   showPublicSite();
 
@@ -497,12 +516,14 @@ function setupLogout() {
     "#dashboardLogout",
     "#profileMenuLogout",
     "#logoutButton"
-  ].forEach((selector) => {
-    $(selector)?.addEventListener(
-      "click",
-      logout
-    );
-  });
+  ].forEach(
+    (selector) => {
+      $(selector)?.addEventListener(
+        "click",
+        logout
+      );
+    }
+  );
 }
 
 /* --------------------------------
@@ -660,6 +681,7 @@ function renderMemberships(
 
           card.innerHTML = `
             <div class="circle-card-content">
+
               <div class="eyebrow">
                 ${escapeHTML(
                   circle?.type ||
@@ -728,6 +750,7 @@ function renderMemberships(
               }
 
               <div class="circle-card-actions">
+
                 <button
                   class="ghost view-circle-button"
                   data-circle-id="${escapeHTML(
@@ -793,6 +816,7 @@ function renderMemberships(
                     `
                     : ""
                 }
+
               </div>
             </div>
           `;
@@ -887,8 +911,146 @@ function renderMemberships(
 }
 
 /* --------------------------------
-   PAYOUT WEEK SELECTION
+   PAYOUT WEEK MODAL
 --------------------------------- */
+
+function openPayoutWeekModal() {
+  const modal =
+    $("#payoutWeekModal");
+
+  if (!modal) {
+    return;
+  }
+
+  show(modal);
+
+  document.body.classList.add(
+    "modal-open"
+  );
+}
+
+function closePayoutWeekModal() {
+  const modal =
+    $("#payoutWeekModal");
+
+  if (modal) {
+    hide(modal);
+  }
+
+  document.body.classList.remove(
+    "modal-open"
+  );
+
+  payoutWeekMembership = null;
+}
+
+function renderPayoutWeekOptions(
+  dates
+) {
+  const list =
+    $("#payoutWeekList");
+
+  const message =
+    $("#payoutWeekMessage");
+
+  if (!list) {
+    return;
+  }
+
+  list.innerHTML = "";
+
+  if (message) {
+    message.textContent = "";
+  }
+
+  if (!dates.length) {
+    list.innerHTML = `
+      <div class="empty-state compact">
+        <div class="empty-icon">↗</div>
+
+        <strong>
+          No payout weeks available
+        </strong>
+
+        <span>
+          All available payout weeks have already been selected.
+          Please check again later.
+        </span>
+      </div>
+    `;
+
+    return;
+  }
+
+  dates.forEach(
+    (date, index) => {
+      const button =
+        document.createElement(
+          "button"
+        );
+
+      button.type = "button";
+      button.className =
+        "payout-week-option";
+
+      button.dataset.payoutDateId =
+        date.id;
+
+      const payoutDate =
+        formatDate(
+          date.payoutAt
+        );
+
+      const payoutTime =
+        formatDateTime(
+          date.payoutAt
+        );
+
+      button.innerHTML = `
+        <span class="payout-week-number">
+          ${index + 1}
+        </span>
+
+        <span class="payout-week-option-content">
+
+          <strong>
+            Week ${index + 1}
+          </strong>
+
+          <span>
+            ${escapeHTML(
+              payoutDate
+            )}
+          </span>
+
+          <small>
+            ${escapeHTML(
+              payoutTime
+            )}
+          </small>
+
+        </span>
+
+        <span class="payout-week-arrow">
+          →
+        </span>
+      `;
+
+      button.addEventListener(
+        "click",
+        () => {
+          selectPayoutWeek(
+            date
+          );
+        }
+      );
+
+      list.appendChild(
+        button
+      );
+    }
+  );
+}
 
 async function choosePayoutWeek(
   membership
@@ -912,6 +1074,79 @@ async function choosePayoutWeek(
     return;
   }
 
+  payoutWeekMembership =
+    membership;
+
+  selectedMembership =
+    membership;
+
+  selectedCircle =
+    circle;
+
+  const circleName =
+    $("#payoutWeekCircle");
+
+  if (circleName) {
+    circleName.innerHTML = `
+      <strong>
+        ${escapeHTML(
+          circle.name ||
+            circle.code ||
+            "PayaCircle"
+        )}
+      </strong>
+
+      <span>
+        Contribution:
+        ${money(
+          circle.amountCents
+        )}
+      </span>
+    `;
+  }
+
+  const intro =
+    $("#payoutWeekIntro");
+
+  if (intro) {
+    intro.innerHTML = `
+      <strong>
+        Your circle is now full!
+      </strong>
+
+      <p>
+        Your weekly payout schedule has been created.
+        Choose the week you would prefer to receive your payout.
+      </p>
+    `;
+  }
+
+  const list =
+    $("#payoutWeekList");
+
+  if (list) {
+    list.innerHTML = `
+      <div class="payment-processing">
+        <strong>
+          Loading available payout weeks...
+        </strong>
+
+        <p>
+          Please wait.
+        </p>
+      </div>
+    `;
+  }
+
+  const message =
+    $("#payoutWeekMessage");
+
+  if (message) {
+    message.textContent = "";
+  }
+
+  openPayoutWeekModal();
+
   try {
     const dates =
       await api(
@@ -931,60 +1166,67 @@ async function choosePayoutWeek(
           )
       );
 
-    if (!availableDates.length) {
-      alert(
-        "There are currently no available payout weeks."
-      );
-
-      return;
-    }
-
-    const options =
+    renderPayoutWeekOptions(
       availableDates
-        .map(
-          (date, index) =>
-            `${index + 1}. ${formatDate(
-              date.payoutAt
-            )}`
-        )
-        .join("\n");
+    );
+  } catch (error) {
+    console.error(
+      "Payout schedule error:",
+      error
+    );
 
-    const selectedNumber =
-      prompt(
-        `Your Circle is now full!\n\n` +
-        `Your weekly payout schedule has been created.\n\n` +
-        `Choose your preferred payout week:\n\n` +
-        `${options}\n\n` +
-        `Enter the number of your preferred week:`
-      );
-
-    if (!selectedNumber) {
-      return;
+    if (list) {
+      list.innerHTML = "";
     }
 
-    const selectedIndex =
-      Number(selectedNumber) - 1;
-
-    if (
-      !Number.isInteger(
-        selectedIndex
-      ) ||
-      selectedIndex < 0 ||
-      selectedIndex >=
-        availableDates.length
-    ) {
-      alert(
-        "Please choose a valid payout week."
-      );
-
-      return;
+    if (message) {
+      message.textContent =
+        error.message ||
+        "Unable to load the payout schedule.";
     }
+  }
+}
 
-    const selectedDate =
-      availableDates[
-        selectedIndex
-      ];
+async function selectPayoutWeek(
+  payoutDate
+) {
+  const membership =
+    payoutWeekMembership;
 
+  if (!membership?.id) {
+    alert(
+      "Your membership could not be found."
+    );
+
+    return;
+  }
+
+  if (!payoutDate?.id) {
+    alert(
+      "That payout week is unavailable."
+    );
+
+    return;
+  }
+
+  const buttons =
+    $$(".payout-week-option");
+
+  buttons.forEach(
+    (button) => {
+      button.disabled = true;
+    }
+  );
+
+  const message =
+    $("#payoutWeekMessage");
+
+  if (message) {
+    message.textContent =
+      "Saving your payout week...";
+  }
+
+  try {
     const updatedMembership =
       await api(
         `/memberships/${encodeURIComponent(
@@ -994,7 +1236,7 @@ async function choosePayoutWeek(
           method: "POST",
           body: JSON.stringify({
             payoutDateId:
-              selectedDate.id
+              payoutDate.id
           })
         }
       );
@@ -1002,24 +1244,69 @@ async function choosePayoutWeek(
     selectedMembership =
       updatedMembership;
 
+    const scheduledDate =
+      updatedMembership?.payoutDate
+        ?.payoutAt ||
+      payoutDate.payoutAt;
+
+    closePayoutWeekModal();
+
     alert(
       `Your payout week has been scheduled for ${formatDate(
-        selectedDate.payoutAt
+        scheduledDate
       )}.`
     );
 
     await loadAccount();
+
+    openAccountPanel(
+      "payouts"
+    );
   } catch (error) {
     console.error(
-      "Payout selection error:",
+      "Payout week selection error:",
       error
     );
 
-    alert(
-      error.message ||
-        "Unable to select your payout week."
+    buttons.forEach(
+      (button) => {
+        button.disabled = false;
+      }
     );
+
+    if (message) {
+      message.textContent =
+        error.message ||
+        "Unable to schedule this payout week.";
+    }
   }
+}
+
+function setupPayoutWeekModal() {
+  $("#closePayoutWeekModal")
+    ?.addEventListener(
+      "click",
+      closePayoutWeekModal
+    );
+
+  $("#cancelPayoutWeek")
+    ?.addEventListener(
+      "click",
+      closePayoutWeekModal
+    );
+
+  $("#payoutWeekModal")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          $("#payoutWeekModal")
+        ) {
+          closePayoutWeekModal();
+        }
+      }
+    );
 }
 
 /* --------------------------------
@@ -1083,7 +1370,8 @@ function renderBalance(
 
   const balanceTargets = [
     "#dashboardBalance",
-    "#balanceAmount"
+    "#balanceAmount",
+    "#accountAvailableBalance"
   ];
 
   balanceTargets.forEach(
@@ -1096,6 +1384,14 @@ function renderBalance(
       }
     }
   );
+
+  const savings =
+    $("#accountTotalSavings");
+
+  if (savings) {
+    savings.textContent =
+      money(captured);
+  }
 }
 
 /* --------------------------------
@@ -1108,6 +1404,56 @@ async function loadPayments() {
       await api("/payments");
 
     renderBalance(payments);
+
+    const capturedPayments =
+      payments.filter(
+        (payment) =>
+          payment.status ===
+          "CAPTURED"
+      );
+
+    const pendingPayments =
+      payments.filter(
+        (payment) =>
+          payment.status ===
+          "CREATED" ||
+          payment.status ===
+          "APPROVED"
+      );
+
+    const contributionTotal =
+      $("#contributionTotal");
+
+    if (contributionTotal) {
+      contributionTotal.textContent =
+        money(
+          capturedPayments.reduce(
+            (total, payment) =>
+              total +
+              Number(
+                payment.amountCents ||
+                  0
+              ),
+            0
+          )
+        );
+    }
+
+    const contributionPaidCount =
+      $("#contributionPaidCount");
+
+    if (contributionPaidCount) {
+      contributionPaidCount.textContent =
+        capturedPayments.length;
+    }
+
+    const contributionPendingCount =
+      $("#contributionPendingCount");
+
+    if (contributionPendingCount) {
+      contributionPendingCount.textContent =
+        pendingPayments.length;
+    }
 
     const containers = [
       $("#paymentsList"),
@@ -1294,6 +1640,105 @@ async function loadPayouts() {
         );
       }
     );
+
+    const nextPayout =
+      [...payouts]
+        .filter(
+          (payout) =>
+            payout.status ===
+              "SCHEDULED" ||
+            payout.status ===
+              "PROCESSING"
+        )
+        .sort(
+          (a, b) =>
+            new Date(
+              a.payoutDate
+                ?.payoutAt || 0
+            ) -
+            new Date(
+              b.payoutDate
+                ?.payoutAt || 0
+            )
+        )[0];
+
+    const nextAmount =
+      $("#payoutPageNextAmount");
+
+    const nextDate =
+      $("#payoutPageNextDate");
+
+    const dashboardNext =
+      $("#dashboardNextPayout");
+
+    const overviewDate =
+      $("#overviewPayoutDate");
+
+    const overviewDetails =
+      $("#overviewPayoutDetails");
+
+    if (nextPayout) {
+      const amount =
+        money(
+          nextPayout.netAmountCents
+        );
+
+      const date =
+        formatDate(
+          nextPayout.payoutDate
+            ?.payoutAt
+        );
+
+      if (nextAmount) {
+        nextAmount.textContent =
+          amount;
+      }
+
+      if (nextDate) {
+        nextDate.textContent =
+          date;
+      }
+
+      if (dashboardNext) {
+        dashboardNext.textContent =
+          date;
+      }
+
+      if (overviewDate) {
+        overviewDate.textContent =
+          date;
+      }
+
+      if (overviewDetails) {
+        overviewDetails.textContent =
+          `${amount} scheduled payout`;
+      }
+    } else {
+      if (nextAmount) {
+        nextAmount.textContent =
+          "$0.00";
+      }
+
+      if (nextDate) {
+        nextDate.textContent =
+          "No payout currently scheduled";
+      }
+
+      if (dashboardNext) {
+        dashboardNext.textContent =
+          "—";
+      }
+
+      if (overviewDate) {
+        overviewDate.textContent =
+          "No payout scheduled";
+      }
+
+      if (overviewDetails) {
+        overviewDetails.textContent =
+          "Join a circle to schedule a payout.";
+      }
+    }
   } catch (error) {
     console.error(
       "Unable to load payouts:",
@@ -1320,6 +1765,18 @@ async function loadPublicCircles() {
       (container) => {
         container.innerHTML = "";
 
+        if (!circles.length) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">◎</div>
+              <strong>No circles available</strong>
+              <span>New savings circles will appear here.</span>
+            </div>
+          `;
+
+          return;
+        }
+
         circles.forEach(
           (circle) => {
             const card =
@@ -1330,8 +1787,27 @@ async function loadPublicCircles() {
             card.className =
               "circle-card";
 
+            const memberCount =
+              Number(
+                circle._count
+                  ?.memberships ||
+                  0
+              );
+
+            const capacity =
+              Number(
+                circle.capacity ||
+                  0
+              );
+
+            const isFull =
+              capacity > 0 &&
+              memberCount >=
+                capacity;
+
             card.innerHTML = `
               <div class="circle-card-content">
+
                 <div class="eyebrow">
                   ${escapeHTML(
                     circle.type ||
@@ -1359,16 +1835,9 @@ async function loadPublicCircles() {
                 <p>
                   Members:
                   <strong>
-                    ${
-                      circle._count
-                        ?.memberships ||
-                      0
-                    }
+                    ${memberCount}
                     /
-                    ${
-                      circle.capacity ||
-                      0
-                    }
+                    ${capacity}
                   </strong>
                 </p>
 
@@ -1380,6 +1849,7 @@ async function loadPublicCircles() {
                 >
                   View Circle
                 </button>
+
               </div>
             `;
 
@@ -1439,8 +1909,27 @@ async function openCircleDetails(
       return;
     }
 
+    const memberCount =
+      Number(
+        circle._count
+          ?.memberships ||
+          0
+      );
+
+    const capacity =
+      Number(
+        circle.capacity ||
+          0
+      );
+
+    const isFull =
+      capacity > 0 &&
+      memberCount >=
+        capacity;
+
     content.innerHTML = `
       <div class="circle-details">
+
         <div class="eyebrow">
           ${escapeHTML(
             circle.type ||
@@ -1468,16 +1957,9 @@ async function openCircleDetails(
         <p>
           Members:
           <strong>
-            ${
-              circle._count
-                ?.memberships ||
-              0
-            }
+            ${memberCount}
             /
-            ${
-              circle.capacity ||
-              0
-            }
+            ${capacity}
           </strong>
         </p>
 
@@ -1491,14 +1973,49 @@ async function openCircleDetails(
           </strong>
         </p>
 
+        ${
+          isFull
+            ? `
+              <div class="payout-selection-notice">
+                <strong>
+                  Circle Full
+                </strong>
+
+                <p>
+                  This circle has reached its required number
+                  of members and is no longer accepting new members.
+                </p>
+              </div>
+            `
+            : ""
+        }
+
         <div class="circle-details-actions">
-          <button
-            id="joinCircleFromDetails"
-            class="primary"
-          >
-            Join Circle
-          </button>
+
+          ${
+            isFull
+              ? `
+                <button
+                  class="ghost"
+                  type="button"
+                  disabled
+                >
+                  Circle Full
+                </button>
+              `
+              : `
+                <button
+                  id="joinCircleFromDetails"
+                  class="primary"
+                  type="button"
+                >
+                  Join Circle
+                </button>
+              `
+          }
+
         </div>
+
       </div>
     `;
 
@@ -1565,15 +2082,6 @@ async function openJoinCircle(
       return;
     }
 
-    /*
-      IMPORTANT:
-      Do not choose a payout date here.
-
-      Payout dates are created by the
-      backend only when the circle
-      becomes full.
-    */
-
     const membership =
       await api(
         "/memberships",
@@ -1593,13 +2101,6 @@ async function openJoinCircle(
       membership;
 
     await loadAccount();
-
-    /*
-      If the circle became full and
-      the backend created the payout
-      schedule, the user can now
-      choose a payout week.
-    */
 
     const refreshedUser =
       await getCurrentUser();
@@ -1623,12 +2124,6 @@ async function openJoinCircle(
 
       return;
     }
-
-    /*
-      Normal case:
-      membership is payment-pending,
-      so show the PayPal payment panel.
-    */
 
     const paymentMembership =
       refreshedMembership ||
@@ -1694,6 +2189,19 @@ function setupCircleModal() {
     ?.addEventListener(
       "click",
       closeCircleModal
+    );
+
+  $("#circleModal")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target ===
+          $("#circleModal")
+        ) {
+          closeCircleModal();
+        }
+      }
     );
 }
 
@@ -2215,7 +2723,8 @@ async function handlePayPalReturn() {
 
       cleanPayPalUrl();
 
-      await loadAccount();
+      const refreshedUser =
+        await loadAccount();
 
       hide(
         $("#paymentPanel")
@@ -2225,24 +2734,42 @@ async function handlePayPalReturn() {
         "Payment confirmed! Your PayaCircle membership is now active."
       );
 
-      /*
-        If payment completed and the
-        circle is now full, load the
-        refreshed membership and allow
-        the member to choose a payout week.
-      */
+      let membership = null;
 
-      const refreshedUser =
-        await getCurrentUser();
-
-      const membership =
+      if (
         pending?.membershipId
-          ? refreshedUser?.memberships?.find(
+      ) {
+        membership =
+          refreshedUser?.memberships?.find(
+            (item) =>
+              item.id ===
+              pending.membershipId
+          ) || null;
+      }
+
+      if (!membership) {
+        membership =
+          [...(
+            refreshedUser?.memberships ||
+            []
+          )]
+            .filter(
               (item) =>
-                item.id ===
-                pending.membershipId
+                item.status ===
+                "PAID"
             )
-          : null;
+            .sort(
+              (a, b) =>
+                new Date(
+                  b.updatedAt ||
+                    b.createdAt
+                ) -
+                new Date(
+                  a.updatedAt ||
+                    a.createdAt
+                )
+            )[0] || null;
+      }
 
       if (
         membership &&
@@ -2279,6 +2806,7 @@ async function handlePayPalReturn() {
       if (details) {
         details.innerHTML = `
           <div class="payment-error">
+
             <strong>
               Payment confirmation needs attention
             </strong>
@@ -2289,6 +2817,7 @@ async function handlePayPalReturn() {
                   "Please try again."
               )}
             </p>
+
           </div>
         `;
       }
@@ -2464,6 +2993,76 @@ function setupPublicAuthButtons() {
         }
       );
     });
+
+  $("#headerSignIn")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuthModal(
+          "login"
+        );
+      }
+    );
+
+  $("#heroSignIn")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuthModal(
+          "login"
+        );
+      }
+    );
+
+  $("#headerGetStarted")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuthModal(
+          "register"
+        );
+      }
+    );
+
+  $("#heroGetStarted")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuthModal(
+          "register"
+        );
+      }
+    );
+
+  $("#promoGetStarted")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuthModal(
+          "register"
+        );
+      }
+    );
+
+  $("#finalGetStarted")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuthModal(
+          "register"
+        );
+      }
+    );
+
+  $("#footerSignIn")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuthModal(
+          "login"
+        );
+      }
+    );
 }
 
 /* --------------------------------
@@ -2479,6 +3078,7 @@ async function init() {
   setupCircleModal();
   setupPayment();
   setupModals();
+  setupPayoutWeekModal();
   setupForms();
 
   setupPublicAuthButtons();
