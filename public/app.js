@@ -1017,9 +1017,34 @@ async function loadPayouts() {
               </div>
 
               <div>
-                ${money(
-                  payout.amountCents
-                )}
+                <strong>
+                  ${money(
+                    payout.netAmountCents
+                  )}
+                </strong>
+
+                ${
+                  Number(
+                    payout.bankerFeeCents || 0
+                  ) > 0
+                    ? `
+                      <div>
+                        Banker Fee:
+                        ${money(
+                          payout.bankerFeeCents
+                        )}
+                      </div>
+                    `
+                    : ""
+                }
+
+                <div>
+                  Status:
+                  ${escapeHTML(
+                    payout.status ||
+                      "Scheduled"
+                  )}
+                </div>
               </div>
             `;
 
@@ -1037,7 +1062,6 @@ async function loadPayouts() {
     );
   }
 }
-
 /* --------------------------------
    PUBLIC CIRCLES
 --------------------------------- */
@@ -1273,98 +1297,84 @@ function closeCircleDetails() {
    JOIN CIRCLE
 --------------------------------- */
 
-async function openJoinCircle(
-  circle
-) {
+async function openJoinCircle(circle) {
   try {
-    const dates =
-      await api(
-        `/circles/${encodeURIComponent(
-          circle.id
-        )}/dates`
-      );
+    const dates = await api(
+      `/circles/${encodeURIComponent(circle.id)}/dates`
+    );
 
-    const availableDates =
-      dates.filter(
-        (date) =>
-          Number(
-            date.reserved || 0
-          ) <
-          Number(
-            date.capacity || 1
-          )
-      );
+    const availableDates = dates.filter(
+      (date) =>
+        Number(date.reserved || 0) <
+        Number(date.capacity || 1)
+    );
 
     if (!availableDates.length) {
       alert(
-        "There are no available payout dates for this circle."
+        "There are no available payout weeks for this circle."
       );
 
       return;
     }
 
-    const options =
-      availableDates
-        .map(
-          (date) => `
-            <option value="${escapeHTML(
-              date.id
-            )}">
-              ${escapeHTML(
-                formatDate(
-                  date.payoutAt
-                )
-              )}
-            </option>
-          `
-        )
-        .join("");
-
-    const confirmed =
-      confirm(
-        `Join ${circle.name || circle.code} for ${money(circle.amountCents)}?`
-      );
+    const confirmed = confirm(
+      `Join ${circle.name || circle.code} for ${money(
+        circle.amountCents
+      )}?`
+    );
 
     if (!confirmed) {
       return;
     }
 
-    const payoutDateId =
-      prompt(
-        "Enter the payout date ID from the available dates:\n\n" +
-          availableDates
-            .map(
-              (date) =>
-                `${formatDate(
-                  date.payoutAt
-                )} — ${date.id}`
-            )
-            .join("\n")
-      );
+    const payoutOptions = availableDates
+      .map(
+        (date, index) =>
+          `${index + 1}. ${formatDate(date.payoutAt)}`
+      )
+      .join("\n");
 
-    if (!payoutDateId) {
+    const selectedNumber = prompt(
+      `Choose your preferred payout week.\n\n` +
+        payoutOptions +
+        `\n\nEnter the number of your preferred week:`
+    );
+
+    if (!selectedNumber) {
       return;
     }
 
-    const membership =
-      await api(
-        "/memberships",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            circleId:
-              circle.id,
-            payoutDateId:
-              payoutDateId.trim()
-          })
-        }
+    const selectedIndex =
+      Number(selectedNumber) - 1;
+
+    if (
+      !Number.isInteger(selectedIndex) ||
+      selectedIndex < 0 ||
+      selectedIndex >= availableDates.length
+    ) {
+      alert(
+        "Please choose a valid payout week."
       );
 
-    selectedCircle =
-      circle;
+      return;
+    }
 
-    selectedMembership =
-      membership;
+    const selectedDate =
+      availableDates[selectedIndex];
+
+    const membership = await api(
+      "/memberships",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          circleId: circle.id,
+          payoutDateId: selectedDate.id
+        })
+      }
+    );
+
+    selectedCircle = circle;
+    selectedMembership = membership;
 
     await loadAccount();
 
@@ -1512,7 +1522,6 @@ async function createCircle(
 /* --------------------------------
    PAYMENT PANEL
 --------------------------------- */
-
 function renderPaymentDetails(
   circle,
   membership
@@ -1523,6 +1532,25 @@ function renderPaymentDetails(
   if (!details) {
     return;
   }
+
+  const contributionCents =
+    Number(circle?.amountCents || 0);
+
+  const bankerFeeBps = 700;
+
+  const bankerFeeCents =
+    Math.round(
+      contributionCents *
+        bankerFeeBps /
+        10000
+    );
+
+  const payoutAfterFeeCents =
+    Math.max(
+      0,
+      contributionCents -
+        bankerFeeCents
+    );
 
   details.innerHTML = `
     <div class="payment-detail-row">
@@ -1540,7 +1568,32 @@ function renderPaymentDetails(
       <span>Contribution</span>
       <strong>
         ${money(
-          circle?.amountCents
+          contributionCents
+        )}
+      </strong>
+    </div>
+
+    <div class="payment-detail-row">
+      <span>PayaCircle Banker Fee</span>
+      <strong>
+        7%
+      </strong>
+    </div>
+
+    <div class="payment-detail-row">
+      <span>Banker Fee</span>
+      <strong>
+        −${money(
+          bankerFeeCents
+        )}
+      </strong>
+    </div>
+
+    <div class="payment-detail-row">
+      <span>Amount after Banker Fee</span>
+      <strong>
+        ${money(
+          payoutAfterFeeCents
         )}
       </strong>
     </div>
@@ -1573,34 +1626,6 @@ function renderPaymentDetails(
         : ""
     }
   `;
-}
-
-async function openPaymentPanel(
-  circle,
-  membership
-) {
-  if (!circle) {
-    return;
-  }
-
-  selectedCircle =
-    circle;
-
-  selectedMembership =
-    membership || null;
-
-  renderPaymentDetails(
-    circle,
-    membership
-  );
-
-  show($("#paymentPanel"));
-
-  $("#paymentPanel")
-    ?.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
 }
 
 /* --------------------------------
