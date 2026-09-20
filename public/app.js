@@ -384,8 +384,51 @@ function setupProfileMenu() {
   const menu =
     $("#accountProfileMenu");
 
+  function toggleProfileMenu(event) {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (!menu) {
+      return;
+    }
+
+    menu.style.display =
+      menu.style.display === "block"
+        ? "none"
+        : "block";
+  }
+
   if (trigger && menu) {
     trigger.addEventListener(
+      "click",
+      toggleProfileMenu
+    );
+
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (
+          !menu.contains(event.target) &&
+          event.target !== trigger &&
+          !trigger.contains(event.target)
+        ) {
+          hide(menu);
+        }
+      }
+    );
+  }
+
+  /*
+    Mobile M button:
+    Open the same account menu instead
+    of immediately opening Profile.
+  */
+  const mobileProfile =
+    $("#mobileProfileButton");
+
+  if (mobileProfile && menu) {
+    mobileProfile.addEventListener(
       "click",
       (event) => {
         event.stopPropagation();
@@ -396,22 +439,7 @@ function setupProfileMenu() {
             : "block";
       }
     );
-
-    document.addEventListener(
-      "click",
-      () => {
-        hide(menu);
-      }
-    );
   }
-
-  $("#mobileProfileButton")
-    ?.addEventListener(
-      "click",
-      () => {
-        openAccountPanel("profile");
-      }
-    );
 }
 
 /* --------------------------------
