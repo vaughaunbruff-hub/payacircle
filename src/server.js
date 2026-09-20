@@ -2920,18 +2920,142 @@ app.post(
 app.post(
   "/api/paypal/webhook",
   async (req, res) => {
-    const eventType =
-      req.body?.event_type ||
-      "unknown";
-
-    console.log(
-      "PayPal webhook received:",
-      eventType
-    );
-
     try {
+      if (!PAYPAL_WEBHOOK_ID) {
+        console.error(
+          "PayPal webhook rejected: PAYPAL_WEBHOOK_ID is not configured."
+        );
+
+        return res.status(500).json({
+          received: false
+        });
+      }
+
+      const rawBody = req.rawBody;
+
+      if (!rawBody) {
+        console.error(
+          "PayPal webhook rejected: raw body is missing."
+        );
+
+        return res.status(400).json({
+          received: false
+        });
+      }
+
+      const transmissionId =
+        req.headers["paypal-transmission-id"];
+
+      const transmissionTime =
+        req.headers["paypal-transmission-time"];
+
+      const transmissionSig =
+        req.headers["paypal-transmission-sig"];
+
+      const certUrl =
+        req.headers["paypal-cert-url"];
+
+      const authAlgo =
+        req.headers["paypal-auth-algo"];
+
+      if (
+        !transmissionId ||
+        !transmissionTime ||
+        !transmissionSig ||
+        !certUrl ||
+        !authAlgo
+      ) {
+        console.error(
+          "PayPal webhook rejected: required PayPal headers are missing."
+        );
+
+        return res.status(400).json({
+          received: false
+        });
+      }
+
+      let event;
+
+      try {
+        event = JSON.parse(
+          rawBody.toString("utf8")
+        );
+      } catch (error) {
+        console.error(
+          "PayPal webhook rejected: invalid JSON."
+        );
+
+        return res.status(400).json({
+          received: false
+        });
+      }
+
+      /*
+        Verify the webhook with PayPal before
+        processing any payout information.
+      */
+
+      const verificationResponse =
+        await paypalRequest(
+          "/v1/notifications/verify-webhook-signature",
+          {
+            method: "POST",
+
+            body: JSON.stringify({
+  auth_algo:
+    authAlgo,
+
+  cert_url:
+    certUrl,
+
+  transmission_id:
+    transmissionId,
+
+  transmission_sig:
+    transmissionSig,
+
+  transmission_time:
+    transmissionTime,
+
+  webhook_id:
+    PAYPAL_WEBHOOK_ID,
+
+  webhook_event:
+    event
+})
+          }
+        );
+
+      if (
+        verificationResponse?.verification_status !==
+        "SUCCESS"
+      ) {
+        console.error(
+          "PayPal webhook rejected: signature verification failed."
+        );
+
+        return res.status(401).json({
+          received: false
+        });
+      }
+
+      const eventType =
+        event?.event_type ||
+        "unknown";
+
+      console.log(
+        "Verified PayPal webhook:",
+        eventType,
+        event?.id || ""
+      );
+
+      /*
+        Only process payout events after
+        PayPal signature verification succeeds.
+      */
+
       const resource =
-        req.body?.resource;
+        event?.resource || {};
 
       const payoutItemId =
         resource?.payout_item_id ||
@@ -2950,6 +3074,11 @@ app.post(
         null;
 
       let payout = null;
+
+      /*
+        Match our payout using our own payout
+        database ID first, then PayPal IDs.
+      */
 
       if (senderItemId) {
         payout =
@@ -2987,61 +3116,88 @@ app.post(
           });
       }
 
-      if (payout) {
-        let status = null;
+      /*
+        A verified PayPal event may legitimately
+        refer to a payout that is not in our
+        database. Acknowledge it without failure.
+      */
 
-        if (
-          eventType.includes(
-            "SUCCEEDED"
-          )
-        ) {
-          status =
-            "COMPLETED";
-        }
+      if (!payout) {
+        console.log(
+          "Verified PayPal webhook received with no matching payout:",
+          eventType
+        );
 
-        if (
-          eventType.includes(
-            "FAILED"
-          ) ||
-          eventType.includes(
-            "RETURNED"
-          ) ||
-          eventType.includes(
-            "BLOCKED"
-          ) ||
-          eventType.includes(
-            "CANCELED"
-          )
-        ) {
-          status =
-            "FAILED";
-        }
-
-        if (
-          status
-        ) {
-          await prisma.payout.update({
-            where: {
-              id:
-                payout.id
-            },
-
-            data: {
-              status,
-
-              paypalItemId:
-                payoutItemId ||
-                payout.paypalItemId,
-
-              paypalBatchId:
-                payoutBatchId ||
-                payout.paypalBatchId
-            }
-          });
-        }
+        return res.json({
+          received: true
+        });
       }
 
-      res.json({
+      let status = null;
+
+      if (
+        eventType.includes(
+          "SUCCEEDED"
+        )
+      ) {
+        status =
+          "COMPLETED";
+      }
+
+      if (
+        eventType.includes(
+          "FAILED"
+        ) ||
+        eventType.includes(
+          "RETURNED"
+        ) ||
+        eventType.includes(
+          "BLOCKED"
+        ) ||
+        eventType.includes(
+          "CANCELED"
+        ) ||
+        eventType.includes(
+          "CANCELLED"
+        )
+      ) {
+        status =
+          "FAILED";
+      }
+
+      const updateData = {
+        paypalItemId:
+          payoutItemId ||
+          payout.paypalItemId,
+
+        paypalBatchId:
+          payoutBatchId ||
+          payout.paypalBatchId
+      };
+
+      if (status) {
+        updateData.status =
+          status;
+      }
+
+      await prisma.payout.update({
+        where: {
+          id:
+            payout.id
+        },
+
+        data:
+          updateData
+      });
+
+      console.log(
+        "PayPal payout updated:",
+        payout.id,
+        status ||
+          "NO_STATUS_CHANGE"
+      );
+
+      return res.json({
         received: true
       });
     } catch (error) {
@@ -3051,13 +3207,12 @@ app.post(
       );
 
       /*
-        Return 200 so PayPal does not repeatedly
-        resend an event because of a local
-        processing error.
+        Return 500 for unexpected local errors
+        so PayPal can retry the webhook.
       */
 
-      res.json({
-        received: true
+      return res.status(500).json({
+        received: false
       });
     }
   }
