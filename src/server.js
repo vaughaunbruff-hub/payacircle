@@ -6,13 +6,19 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { z } from "zod";
+import OpenAI from "openai";
 import pkg from "@prisma/client";
-
-const { PrismaClient } = pkg;
 
 dotenv.config();
 
+const { PrismaClient } = pkg;
+
 const prisma = new PrismaClient();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
 const app = express();
 
 app.set("trust proxy", 1);
