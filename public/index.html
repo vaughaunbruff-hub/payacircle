@@ -2672,5 +2672,90 @@
 
   <script src="/app.js"></script>
 
+  <!-- LEADOUT AI SUPPORT -->
+  <div id="leadoutWidget" class="leadout-widget">
+
+    <button
+      id="leadoutToggle"
+      class="leadout-toggle"
+      type="button"
+      aria-label="Open LEADOUT AI support"
+      aria-expanded="false"
+    >
+      <span class="leadout-avatar">L</span>
+      <span class="leadout-online"></span>
+    </button>
+
+    <section
+      id="leadoutChat"
+      class="leadout-chat"
+      aria-hidden="true"
+    >
+
+      <header class="leadout-header">
+        <div class="leadout-avatar large">L</div>
+
+        <div class="leadout-title">
+          <strong>LEADOUT</strong>
+          <span>AI PayaCircle Support</span>
+        </div>
+
+        <button
+          id="leadoutClose"
+          class="leadout-close"
+          type="button"
+          aria-label="Close LEADOUT"
+        >
+          ×
+        </button>
+      </header>
+
+      <div
+        id="leadoutMessages"
+        class="leadout-messages"
+      >
+        <div class="leadout-message bot">
+          <strong>LEADOUT</strong>
+          <p>
+            Hi! I'm LEADOUT, your PayaCircle AI support assistant.
+            How can I help you today?
+          </p>
+        </div>
+      </div>
+
+      <div class="leadout-suggestions">
+        <button type="button" data-leadout-question="How does PayaCircle work?">
+          How does it work?
+        </button>
+
+        <button type="button" data-leadout-question="What is the 7% banker fee?">
+          Banker fee
+        </button>
+
+        <button type="button" data-leadout-question="How do I join a circle?">
+          Joining a circle
+        </button>
+      </div>
+
+      <form id="leadoutForm" class="leadout-form">
+        <input
+          id="leadoutInput"
+          type="text"
+          maxlength="4000"
+          placeholder="Ask LEADOUT..."
+          autocomplete="off"
+        />
+
+        <button
+          type="submit"
+          aria-label="Send message"
+        >
+          ➤
+        </button>
+      </form>
+
+    </section>
+  </div>
+
 </body>
 </html>
