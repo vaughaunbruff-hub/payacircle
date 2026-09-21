@@ -3177,3 +3177,275 @@ document.addEventListener(
   "DOMContentLoaded",
   init
 );
+
+/* --------------------------------
+   LEADOUT AI SUPPORT
+--------------------------------- */
+
+(() => {
+  const toggle = document.getElementById(
+    "leadoutToggle"
+  );
+
+  const chat = document.getElementById(
+    "leadoutChat"
+  );
+
+  const close = document.getElementById(
+    "leadoutClose"
+  );
+
+  const form = document.getElementById(
+    "leadoutForm"
+  );
+
+  const input = document.getElementById(
+    "leadoutInput"
+  );
+
+  const messages = document.getElementById(
+    "leadoutMessages"
+  );
+
+  if (
+    !toggle ||
+    !chat ||
+    !close ||
+    !form ||
+    !input ||
+    !messages
+  ) {
+    return;
+  }
+
+  const conversation = [];
+
+  function escapeLeadoutHTML(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function addMessage(
+    role,
+    text
+  ) {
+    const message =
+      document.createElement("div");
+
+    message.className =
+      `leadout-message ${role}`;
+
+    const label =
+      role === "user"
+        ? "You"
+        : "LEADOUT";
+
+    message.innerHTML = `
+      <strong>${label}</strong>
+      <p>${escapeLeadoutHTML(
+        text
+      ).replace(/\n/g, "<br>")}</p>
+    `;
+
+    messages.appendChild(message);
+
+    messages.scrollTop =
+      messages.scrollHeight;
+  }
+
+  function setChatOpen(
+    open
+  ) {
+    chat.classList.toggle(
+      "open",
+      open
+    );
+
+    toggle.setAttribute(
+      "aria-expanded",
+      String(open)
+    );
+
+    chat.setAttribute(
+      "aria-hidden",
+      String(!open)
+    );
+
+    if (open) {
+      setTimeout(() => {
+        input.focus();
+      }, 100);
+    }
+  }
+
+  toggle.addEventListener(
+    "click",
+    () => {
+      setChatOpen(
+        !chat.classList.contains(
+          "open"
+        )
+      );
+    }
+  );
+
+  close.addEventListener(
+    "click",
+    () => {
+      setChatOpen(false);
+    }
+  );
+
+  async function askLeadout(
+    question
+  ) {
+    const trimmed =
+      String(question || "")
+        .trim();
+
+    if (!trimmed) {
+      return;
+    }
+
+    addMessage(
+      "user",
+      trimmed
+    );
+
+    conversation.push({
+      role: "user",
+      content: trimmed
+    });
+
+    input.value = "";
+    input.disabled = true;
+
+    const sendButton =
+      form.querySelector(
+        "button[type='submit']"
+      );
+
+    if (sendButton) {
+      sendButton.disabled =
+        true;
+    }
+
+    const typing =
+      document.createElement(
+        "div"
+      );
+
+    typing.className =
+      "leadout-message bot leadout-typing";
+
+    typing.innerHTML = `
+      <strong>LEADOUT</strong>
+      <p>Thinking...</p>
+    `;
+
+    messages.appendChild(
+      typing
+    );
+
+    messages.scrollTop =
+      messages.scrollHeight;
+
+    try {
+      const response =
+        await fetch(
+          "/api/leadout/chat",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+            body: JSON.stringify({
+              messages:
+                conversation
+            })
+          }
+        );
+
+      const data =
+        await response.json()
+          .catch(() => ({}));
+
+      typing.remove();
+
+      if (
+        !response.ok ||
+        !data.answer
+      ) {
+        throw new Error(
+          data.error ||
+          "LEADOUT is temporarily unavailable."
+        );
+      }
+
+      conversation.push({
+        role: "assistant",
+        content: data.answer
+      });
+
+      addMessage(
+        "bot",
+        data.answer
+      );
+    } catch (error) {
+      console.error(
+        "LEADOUT chat error:",
+        error
+      );
+
+      typing.remove();
+
+      addMessage(
+        "bot",
+        "I'm having trouble connecting right now. Please try again in a moment."
+      );
+    } finally {
+      input.disabled = false;
+
+      if (sendButton) {
+        sendButton.disabled =
+          false;
+      }
+
+      input.focus();
+    }
+  }
+
+  form.addEventListener(
+    "submit",
+    (event) => {
+      event.preventDefault();
+
+      askLeadout(
+        input.value
+      );
+    }
+  );
+
+  document
+    .querySelectorAll(
+      "[data-leadout-question]"
+    )
+    .forEach(
+      (button) => {
+        button.addEventListener(
+          "click",
+          () => {
+            askLeadout(
+              button.dataset
+                .leadoutQuestion
+            );
+          }
+        );
+      }
+    );
+})();
