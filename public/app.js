@@ -1823,127 +1823,105 @@ async function loadPayouts() {
 --------------------------------- */
 
 async function loadPublicCircles() {
+  const containers = [
+    $("#publicCircles"),
+    $("#publicCircleGrid")
+  ].filter(Boolean);
+
+  // Signed out: do not display circle data.
+  if (!currentUser) {
+    containers.forEach((container) => {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">◎</div>
+          <strong>Sign in to view savings circles</strong>
+          <span>Access available circles from your PayaCircle account.</span>
+        </div>
+      `;
+    });
+
+    return;
+  }
+
   try {
-    const circles =
-      await api("/circles");
+    const circles = await api("/circles");
 
-    const containers = [
-      $("#publicCircles"),
-      $("#publicCircleGrid")
-    ].filter(Boolean);
+    containers.forEach((container) => {
+      container.innerHTML = "";
 
-    containers.forEach(
-      (container) => {
-        container.innerHTML = "";
+      if (!circles.length) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">◎</div>
+            <strong>No circles available</strong>
+            <span>New savings circles will appear here.</span>
+          </div>
+        `;
 
-        if (!circles.length) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-icon">◎</div>
-              <strong>No circles available</strong>
-              <span>New savings circles will appear here.</span>
-            </div>
-          `;
-
-          return;
-        }
-
-        circles.forEach(
-          (circle) => {
-            const card =
-              document.createElement(
-                "div"
-              );
-
-            card.className =
-              "circle-card";
-
-            const memberCount =
-              Number(
-                circle._count
-                  ?.memberships ||
-                  0
-              );
-
-            const capacity =
-              Number(
-                circle.capacity ||
-                  0
-              );
-
-            const isFull =
-              capacity > 0 &&
-              memberCount >=
-                capacity;
-
-            card.innerHTML = `
-              <div class="circle-card-content">
-
-                <div class="eyebrow">
-                  ${escapeHTML(
-                    circle.type ||
-                      "CIRCLE"
-                  )}
-                </div>
-
-                <h3>
-                  ${escapeHTML(
-                    circle.name ||
-                      circle.code ||
-                      "PayaCircle"
-                  )}
-                </h3>
-
-                <p>
-                  Contribution:
-                  <strong>
-                    ${money(
-                      circle.amountCents
-                    )}
-                  </strong>
-                </p>
-
-                <p>
-                  Members:
-                  <strong>
-                    ${memberCount}
-                    /
-                    ${capacity}
-                  </strong>
-                </p>
-
-                <button
-                  class="primary public-view-circle"
-                  data-circle-id="${escapeHTML(
-                    circle.id
-                  )}"
-                >
-                  View Circle
-                </button>
-
-              </div>
-            `;
-
-            container.appendChild(
-              card
-            );
-          }
-        );
+        return;
       }
-    );
 
-    $$(".public-view-circle")
-      .forEach((button) => {
-        button.addEventListener(
-          "click",
-          () => {
-            openCircleDetails(
-              button.dataset
-                .circleId
-            );
-          }
+      circles.forEach((circle) => {
+        const card = document.createElement("div");
+
+        card.className = "circle-card";
+
+        const memberCount =
+          Number(circle._count?.memberships || 0);
+
+        const capacity =
+          Number(circle.capacity || 0);
+
+        card.innerHTML = `
+          <div class="circle-card-content">
+
+            <div class="eyebrow">
+              ${escapeHTML(circle.type || "CIRCLE")}
+            </div>
+
+            <h3>
+              ${escapeHTML(
+                circle.name ||
+                circle.code ||
+                "PayaCircle"
+              )}
+            </h3>
+
+            <p>
+              Contribution:
+              <strong>
+                ${money(circle.amountCents)}
+              </strong>
+            </p>
+
+            <p>
+              Members:
+              <strong>
+                ${memberCount} / ${capacity}
+              </strong>
+            </p>
+
+            <button
+              class="primary public-view-circle"
+              data-circle-id="${escapeHTML(circle.id)}"
+            >
+              View Circle
+            </button>
+
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    });
+
+    $$(".public-view-circle").forEach((button) => {
+      button.addEventListener("click", () => {
+        openCircleDetails(
+          button.dataset.circleId
         );
       });
+    });
   } catch (error) {
     console.error(
       "Unable to load circles:",
