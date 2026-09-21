@@ -3182,7 +3182,7 @@ document.addEventListener(
    LEADOUT AI SUPPORT
 --------------------------------- */
 
-(() => {
+document.addEventListener("DOMContentLoaded", () => {
   const toggle = document.getElementById(
     "leadoutToggle"
   );
@@ -3229,10 +3229,7 @@ document.addEventListener(
       .replace(/'/g, "&#039;");
   }
 
-  function addMessage(
-    role,
-    text
-  ) {
+  function addMessage(role, text) {
     const message =
       document.createElement("div");
 
@@ -3246,9 +3243,10 @@ document.addEventListener(
 
     message.innerHTML = `
       <strong>${label}</strong>
-      <p>${escapeLeadoutHTML(
-        text
-      ).replace(/\n/g, "<br>")}</p>
+      <p>${escapeLeadoutHTML(text).replace(
+        /\n/g,
+        "<br>"
+      )}</p>
     `;
 
     messages.appendChild(message);
@@ -3257,9 +3255,7 @@ document.addEventListener(
       messages.scrollHeight;
   }
 
-  function setChatOpen(
-    open
-  ) {
+  function setChatOpen(open) {
     chat.classList.toggle(
       "open",
       open
@@ -3284,28 +3280,29 @@ document.addEventListener(
 
   toggle.addEventListener(
     "click",
-    () => {
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
       setChatOpen(
-        !chat.classList.contains(
-          "open"
-        )
+        !chat.classList.contains("open")
       );
     }
   );
 
   close.addEventListener(
     "click",
-    () => {
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
       setChatOpen(false);
     }
   );
 
-  async function askLeadout(
-    question
-  ) {
+  async function askLeadout(question) {
     const trimmed =
-      String(question || "")
-        .trim();
+      String(question || "").trim();
 
     if (!trimmed) {
       return;
@@ -3330,14 +3327,11 @@ document.addEventListener(
       );
 
     if (sendButton) {
-      sendButton.disabled =
-        true;
+      sendButton.disabled = true;
     }
 
     const typing =
-      document.createElement(
-        "div"
-      );
+      document.createElement("div");
 
     typing.className =
       "leadout-message bot leadout-typing";
@@ -3347,9 +3341,7 @@ document.addEventListener(
       <p>Thinking...</p>
     `;
 
-    messages.appendChild(
-      typing
-    );
+    messages.appendChild(typing);
 
     messages.scrollTop =
       messages.scrollHeight;
@@ -3372,7 +3364,8 @@ document.addEventListener(
         );
 
       const data =
-        await response.json()
+        await response
+          .json()
           .catch(() => ({}));
 
       typing.remove();
@@ -3412,8 +3405,7 @@ document.addEventListener(
       input.disabled = false;
 
       if (sendButton) {
-        sendButton.disabled =
-          false;
+        sendButton.disabled = false;
       }
 
       input.focus();
@@ -3424,10 +3416,9 @@ document.addEventListener(
     "submit",
     (event) => {
       event.preventDefault();
+      event.stopPropagation();
 
-      askLeadout(
-        input.value
-      );
+      askLeadout(input.value);
     }
   );
 
@@ -3435,17 +3426,18 @@ document.addEventListener(
     .querySelectorAll(
       "[data-leadout-question]"
     )
-    .forEach(
-      (button) => {
-        button.addEventListener(
-          "click",
-          () => {
-            askLeadout(
-              button.dataset
-                .leadoutQuestion
-            );
-          }
-        );
-      }
-    );
-})();
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          askLeadout(
+            button.dataset
+              .leadoutQuestion
+          );
+        }
+      );
+    });
+});
