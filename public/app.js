@@ -2602,18 +2602,34 @@ function setupPublicAuthButtons() {
 --------------------------------- */
 
 async function init() {
+  /*
+    Set up the public-facing controls FIRST.
+    This prevents a problem in another
+    dashboard setup function from stopping
+    Sign In / Get Started from working.
+  */
   setupAuthModal();
-  setupProfileMenu();
-  setupLogout();
-  setupAccountNavigation();
-
-  setupCircleModal();
-  setupPayment();
-  setupModals();
-  setupPayoutWeekModal();
-  setupForms();
-
   setupPublicAuthButtons();
+
+  /*
+    Set up the rest of the application.
+  */
+  try {
+    setupProfileMenu();
+    setupLogout();
+    setupAccountNavigation();
+
+    setupCircleModal();
+    setupPayment();
+    setupModals();
+    setupPayoutWeekModal();
+    setupForms();
+  } catch (error) {
+    console.error(
+      "Dashboard setup error:",
+      error
+    );
+  }
 
   const paypalParams =
     new URLSearchParams(
@@ -2630,9 +2646,7 @@ async function init() {
   if (user) {
     currentUser = user;
 
-    renderUserInformation(
-      user
-    );
+    renderUserInformation(user);
 
     showDashboard();
 
@@ -2640,18 +2654,34 @@ async function init() {
       user.memberships || []
     );
 
-    await loadPayments();
-    await loadPayouts();
+    try {
+      await loadPayments();
+      await loadPayouts();
 
-    if (hasPayPalReturn) {
-      await handlePayPalReturn();
+      if (hasPayPalReturn) {
+        await handlePayPalReturn();
+      }
+    } catch (error) {
+      console.error(
+        "Account loading error:",
+        error
+      );
     }
   } else {
     showPublicSite();
   }
 
+  /*
+    Load public circles without preventing
+    the rest of the site from working.
+  */
   loadPublicCircles().catch(
-    () => {}
+    (error) => {
+      console.error(
+        "Public circles loading error:",
+        error
+      );
+    }
   );
 }
 
