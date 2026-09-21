@@ -1472,47 +1472,33 @@ function renderBalance(
 
 async function loadPayments() {
   try {
-    const payments =
-      await api("/payments");
+    const payments = await api("/payments");
 
     renderBalance(payments);
 
-    const capturedPayments =
-      payments.filter(
-        (payment) =>
-          payment.status ===
-          "CAPTURED"
-      );
+    const capturedPayments = payments.filter(
+      (payment) => payment.status === "CAPTURED"
+    );
 
-    const pendingPayments =
-      payments.filter(
-        (payment) =>
-          payment.status ===
-          "CREATED" ||
-          payment.status ===
-          "APPROVED"
-      );
+    const pendingPayments = payments.filter(
+      (payment) =>
+        payment.status === "CREATED" ||
+        payment.status === "APPROVED"
+    );
 
-    const contributionTotal =
-      $("#contributionTotal");
+    const contributionTotal = $("#contributionTotal");
 
     if (contributionTotal) {
-      contributionTotal.textContent =
-        money(
-          capturedPayments.reduce(
-            (total, payment) =>
-              total +
-              Number(
-                payment.amountCents ||
-                  0
-              ),
-            0
-          )
-        );
+      contributionTotal.textContent = money(
+        capturedPayments.reduce(
+          (total, payment) =>
+            total + Number(payment.amountCents || 0),
+          0
+        )
+      );
     }
 
-    const contributionPaidCount =
-      $("#contributionPaidCount");
+    const contributionPaidCount = $("#contributionPaidCount");
 
     if (contributionPaidCount) {
       contributionPaidCount.textContent =
@@ -1534,171 +1520,107 @@ async function loadPayments() {
       $("#contributionsPageList")
     ].filter(Boolean);
 
-    containers.forEach(
-      (container) => {
-        container.innerHTML = "";
+    containers.forEach((container) => {
+      container.innerHTML = "";
 
-        if (!payments.length) {
-          container.innerHTML = `
-            <div class="transaction-empty">
-              <div class="transaction-empty-icon">
-                ↙
-              </div>
+      if (!payments.length) {
+        container.innerHTML = `
+          <div class="transaction-empty">
+            <div class="transaction-empty-icon">↙</div>
 
-              <strong>
-                No activity yet
-              </strong>
+            <strong>No activity yet</strong>
 
-              <span>
-                Your contributions and payments
-                will appear here.
-              </span>
-            </div>
-          `;
+            <span>
+              Your contributions and payments will appear here.
+            </span>
+          </div>
+        `;
 
-          return;
+        return;
+      }
+
+      payments.forEach((payment) => {
+        const item = document.createElement("div");
+
+        item.className = "transaction-item";
+
+        const status = String(
+          payment.status || "UNKNOWN"
+        ).toUpperCase();
+
+        let statusLabel = "Pending";
+        let statusClass = "pending";
+        let icon = "↙";
+
+        if (status === "CAPTURED") {
+          statusLabel = "Completed";
+          statusClass = "completed";
+          icon = "✓";
+        } else if (status === "FAILED") {
+          statusLabel = "Failed";
+          statusClass = "failed";
+          icon = "!";
+        } else if (status === "REFUNDED") {
+          statusLabel = "Refunded";
+          statusClass = "refunded";
+          icon = "↩";
+        } else if (
+          status === "CREATED" ||
+          status === "APPROVED"
+        ) {
+          statusLabel = "Pending";
+          statusClass = "pending";
+          icon = "↙";
         }
 
-        payments.forEach(
-          (payment) => {
-            const item =
-              document.createElement(
-                "div"
-              );
+        const circleName =
+          payment.circle?.name ||
+          payment.circle?.code ||
+          "PayaCircle";
 
-            item.className =
-              "transaction-item";
+        item.innerHTML = `
+          <div class="transaction-main">
+            <div
+              class="transaction-icon ${statusClass}"
+              aria-hidden="true"
+            >
+              ${icon}
+            </div>
 
-            const status =
-              String(
-                payment.status ||
-                  "UNKNOWN"
-              ).toUpperCase();
+            <div class="transaction-details">
+              <strong>Contribution</strong>
 
-            let statusLabel =
-              "Pending";
+              <span class="transaction-circle">
+                ${escapeHTML(circleName)}
+              </span>
 
-            let statusClass =
-              "pending";
+              <span class="transaction-date">
+                ${formatDateTime(payment.createdAt)}
+              </span>
+            </div>
+          </div>
 
-            let icon =
-              "↙";
+          <div class="transaction-right">
+            <strong class="transaction-amount">
+              +${money(payment.amountCents)}
+            </strong>
 
-            if (
-              status ===
-              "CAPTURED"
-            ) {
-              statusLabel =
-                "Completed";
+            <span
+              class="transaction-status ${statusClass}"
+            >
+              <span
+                class="transaction-status-dot"
+                aria-hidden="true"
+              ></span>
 
-              statusClass =
-                "completed";
+              ${statusLabel}
+            </span>
+          </div>
+        `;
 
-              icon =
-                "✓";
-            } else if (
-              status ===
-              "FAILED"
-            ) {
-              statusLabel =
-                "Failed";
-
-              statusClass =
-                "failed";
-
-              icon =
-                "!";
-            } else if (
-              status ===
-              "REFUNDED"
-            ) {
-              statusLabel =
-                "Refunded";
-
-              statusClass =
-                "refunded";
-
-              icon =
-                "↩";
-            } else if (
-              status ===
-                "CREATED" ||
-              status ===
-                "APPROVED"
-            ) {
-              statusLabel =
-                "Pending";
-
-              statusClass =
-                "pending";
-
-              icon =
-                "↙";
-            }
-
-            const circleName =
-              payment.circle
-                ?.name ||
-              payment.circle
-                ?.code ||
-              "PayaCircle";
-
-            item.innerHTML = `
-              <div class="transaction-main">
-
-                <div
-                  class="transaction-icon ${statusClass}"
-                >
-                  ${icon}
-                </div>
-
-                <div class="transaction-details">
-
-                  <strong>
-                    Contribution
-                  </strong>
-
-                  <span class="transaction-circle">
-                    ${escapeHTML(
-                      circleName
-                    )}
-                  </span>
-
-                  <span class="transaction-date">
-                    ${formatDateTime(
-                      payment.createdAt
-                    )}
-                  </span>
-
-                </div>
-
-              </div>
-
-              <div class="transaction-right">
-
-                <strong class="transaction-amount">
-                  +${money(
-                    payment.amountCents
-                  )}
-                </strong>
-
-                <span
-                  class="transaction-status ${statusClass}"
-                >
-                  <span class="transaction-status-dot"></span>
-                  ${statusLabel}
-                </span>
-
-              </div>
-            `;
-
-            container.appendChild(
-              item
-            );
-          }
-        );
-      }
-    );
+        container.appendChild(item);
+      });
+    });
   } catch (error) {
     console.error(
       "Unable to load payments:",
