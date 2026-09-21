@@ -1540,9 +1540,19 @@ async function loadPayments() {
 
         if (!payments.length) {
           container.innerHTML = `
-            <div class="empty-state">
-              <h3>No payments yet</h3>
-              <p>Your contribution payments will appear here.</p>
+            <div class="transaction-empty">
+              <div class="transaction-empty-icon">
+                ↙
+              </div>
+
+              <strong>
+                No activity yet
+              </strong>
+
+              <span>
+                Your contributions and payments
+                will appear here.
+              </span>
             </div>
           `;
 
@@ -1559,38 +1569,126 @@ async function loadPayments() {
             item.className =
               "transaction-item";
 
-            item.innerHTML = `
-              <div>
-                <strong>
-                  ${escapeHTML(
-                    payment.circle
-                      ?.name ||
-                      payment.circle
-                        ?.code ||
-                      "PayaCircle"
-                  )}
-                </strong>
+            const status =
+              String(
+                payment.status ||
+                  "UNKNOWN"
+              ).toUpperCase();
 
-                <div>
-                  ${formatDateTime(
-                    payment.createdAt
-                  )}
+            let statusLabel =
+              "Pending";
+
+            let statusClass =
+              "pending";
+
+            let icon =
+              "↙";
+
+            if (
+              status ===
+              "CAPTURED"
+            ) {
+              statusLabel =
+                "Completed";
+
+              statusClass =
+                "completed";
+
+              icon =
+                "✓";
+            } else if (
+              status ===
+              "FAILED"
+            ) {
+              statusLabel =
+                "Failed";
+
+              statusClass =
+                "failed";
+
+              icon =
+                "!";
+            } else if (
+              status ===
+              "REFUNDED"
+            ) {
+              statusLabel =
+                "Refunded";
+
+              statusClass =
+                "refunded";
+
+              icon =
+                "↩";
+            } else if (
+              status ===
+                "CREATED" ||
+              status ===
+                "APPROVED"
+            ) {
+              statusLabel =
+                "Pending";
+
+              statusClass =
+                "pending";
+
+              icon =
+                "↙";
+            }
+
+            const circleName =
+              payment.circle
+                ?.name ||
+              payment.circle
+                ?.code ||
+              "PayaCircle";
+
+            item.innerHTML = `
+              <div class="transaction-main">
+
+                <div
+                  class="transaction-icon ${statusClass}"
+                >
+                  ${icon}
                 </div>
+
+                <div class="transaction-details">
+
+                  <strong>
+                    Contribution
+                  </strong>
+
+                  <span class="transaction-circle">
+                    ${escapeHTML(
+                      circleName
+                    )}
+                  </span>
+
+                  <span class="transaction-date">
+                    ${formatDateTime(
+                      payment.createdAt
+                    )}
+                  </span>
+
+                </div>
+
               </div>
 
-              <div>
-                <strong>
-                  ${money(
+              <div class="transaction-right">
+
+                <strong class="transaction-amount">
+                  +${money(
                     payment.amountCents
                   )}
                 </strong>
 
-                <div>
-                  ${escapeHTML(
-                    payment.status ||
-                      "Unknown"
-                  )}
-                </div>
+                <span
+                  class="transaction-status ${statusClass}"
+                >
+                  <span class="transaction-status-dot"></span>
+                  ${statusLabel}
+                </span>
+
               </div>
             `;
 
@@ -1604,328 +1702,6 @@ async function loadPayments() {
   } catch (error) {
     console.error(
       "Unable to load payments:",
-      error
-    );
-  }
-}
-
-/* --------------------------------
-   PAYOUTS
---------------------------------- */
-
-async function loadPayouts() {
-  try {
-    const payouts =
-      await api("/payouts");
-
-    const containers = [
-      $("#payoutsList"),
-      $("#payoutTimeline")
-    ].filter(Boolean);
-
-    containers.forEach(
-      (container) => {
-        container.innerHTML = "";
-
-        if (!payouts.length) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <h3>No payouts yet</h3>
-              <p>Your scheduled and completed payouts will appear here.</p>
-            </div>
-          `;
-
-          return;
-        }
-
-        payouts.forEach(
-          (payout) => {
-            const item =
-              document.createElement(
-                "div"
-              );
-
-            item.className =
-              "payout-item";
-
-            item.innerHTML = `
-              <div>
-                <strong>
-                  ${escapeHTML(
-                    payout.circle
-                      ?.name ||
-                      payout.circle
-                        ?.code ||
-                      "PayaCircle"
-                  )}
-                </strong>
-
-                <div>
-                  ${
-                    payout.payoutDate
-                      ? formatDate(
-                          payout
-                            .payoutDate
-                            .payoutAt
-                        )
-                      : "—"
-                  }
-                </div>
-              </div>
-
-              <div>
-                <strong>
-                  ${money(
-                    payout.netAmountCents
-                  )}
-                </strong>
-
-                ${
-                  Number(
-                    payout.bankerFeeCents || 0
-                  ) > 0
-                    ? `
-                      <div>
-                        Banker Fee:
-                        ${money(
-                          payout.bankerFeeCents
-                        )}
-                      </div>
-                    `
-                    : ""
-                }
-
-                <div>
-                  Status:
-                  ${escapeHTML(
-                    payout.status ||
-                      "Scheduled"
-                  )}
-                </div>
-              </div>
-            `;
-
-            container.appendChild(
-              item
-            );
-          }
-        );
-      }
-    );
-
-    const nextPayout =
-      [...payouts]
-        .filter(
-          (payout) =>
-            payout.status ===
-              "SCHEDULED" ||
-            payout.status ===
-              "PROCESSING"
-        )
-        .sort(
-          (a, b) =>
-            new Date(
-              a.payoutDate
-                ?.payoutAt || 0
-            ) -
-            new Date(
-              b.payoutDate
-                ?.payoutAt || 0
-            )
-        )[0];
-
-    const nextAmount =
-      $("#payoutPageNextAmount");
-
-    const nextDate =
-      $("#payoutPageNextDate");
-
-    const dashboardNext =
-      $("#dashboardNextPayout");
-
-    const overviewDate =
-      $("#overviewPayoutDate");
-
-    const overviewDetails =
-      $("#overviewPayoutDetails");
-
-    if (nextPayout) {
-      const amount =
-        money(
-          nextPayout.netAmountCents
-        );
-
-      const date =
-        formatDate(
-          nextPayout.payoutDate
-            ?.payoutAt
-        );
-
-      if (nextAmount) {
-        nextAmount.textContent =
-          amount;
-      }
-
-      if (nextDate) {
-        nextDate.textContent =
-          date;
-      }
-
-      if (dashboardNext) {
-        dashboardNext.textContent =
-          date;
-      }
-
-      if (overviewDate) {
-        overviewDate.textContent =
-          date;
-      }
-
-      if (overviewDetails) {
-        overviewDetails.textContent =
-          `${amount} scheduled payout`;
-      }
-    } else {
-      if (nextAmount) {
-        nextAmount.textContent =
-          "$0.00";
-      }
-
-      if (nextDate) {
-        nextDate.textContent =
-          "No payout currently scheduled";
-      }
-
-      if (dashboardNext) {
-        dashboardNext.textContent =
-          "—";
-      }
-
-      if (overviewDate) {
-        overviewDate.textContent =
-          "No payout scheduled";
-      }
-
-      if (overviewDetails) {
-        overviewDetails.textContent =
-          "Join a circle to schedule a payout.";
-      }
-    }
-  } catch (error) {
-    console.error(
-      "Unable to load payouts:",
-      error
-    );
-  }
-}
-
-/* --------------------------------
-   PUBLIC CIRCLES
---------------------------------- */
-
-async function loadPublicCircles() {
-  const containers = [
-    $("#publicCircles"),
-    $("#publicCircleGrid")
-  ].filter(Boolean);
-
-  // Signed out: do not display circle data.
-  if (!currentUser) {
-    containers.forEach((container) => {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">◎</div>
-          <strong>Sign in to view savings circles</strong>
-          <span>Access available circles from your PayaCircle account.</span>
-        </div>
-      `;
-    });
-
-    return;
-  }
-
-  try {
-    const circles = await api("/circles");
-
-    containers.forEach((container) => {
-      container.innerHTML = "";
-
-      if (!circles.length) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">◎</div>
-            <strong>No circles available</strong>
-            <span>New savings circles will appear here.</span>
-          </div>
-        `;
-
-        return;
-      }
-
-      circles.forEach((circle) => {
-        const card = document.createElement("div");
-
-        card.className = "circle-card";
-
-        const memberCount =
-          Number(circle._count?.memberships || 0);
-
-        const capacity =
-          Number(circle.capacity || 0);
-
-        card.innerHTML = `
-          <div class="circle-card-content">
-
-            <div class="eyebrow">
-              ${escapeHTML(circle.type || "CIRCLE")}
-            </div>
-
-            <h3>
-              ${escapeHTML(
-                circle.name ||
-                circle.code ||
-                "PayaCircle"
-              )}
-            </h3>
-
-            <p>
-              Contribution:
-              <strong>
-                ${money(circle.amountCents)}
-              </strong>
-            </p>
-
-            <p>
-              Members:
-              <strong>
-                ${memberCount} / ${capacity}
-              </strong>
-            </p>
-
-            <button
-              class="primary public-view-circle"
-              data-circle-id="${escapeHTML(circle.id)}"
-            >
-              View Circle
-            </button>
-
-          </div>
-        `;
-
-        container.appendChild(card);
-      });
-    });
-
-    $$(".public-view-circle").forEach((button) => {
-      button.addEventListener("click", () => {
-        openCircleDetails(
-          button.dataset.circleId
-        );
-      });
-    });
-  } catch (error) {
-    console.error(
-      "Unable to load circles:",
       error
     );
   }
