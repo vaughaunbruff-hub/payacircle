@@ -3576,3 +3576,446 @@ img{
     min-height: 300px;
   }
 }
+
+/* --------------------------------
+   LEADOUT — PAYACIRCLE AI AVATAR
+--------------------------------- */
+
+.leadout-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      #f7fffb 0%,
+      #e9f8ef 42%,
+      #c9ead7 100%
+    );
+  color: #168657;
+  font-size: 0;
+  font-weight: 800;
+  overflow: visible;
+  isolation: isolate;
+  box-shadow:
+    0 4px 14px rgba(22, 134, 87, 0.18);
+}
+
+/* Modern male AI face created with CSS */
+.leadout-avatar::before {
+  content: "";
+  position: absolute;
+  width: 23px;
+  height: 27px;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 48% 48% 46% 46%;
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      #fffdf9 0%,
+      #f3d8c1 55%,
+      #d9ad91 100%
+    );
+  box-shadow:
+    0 -5px 0 4px #24352d;
+  z-index: 2;
+}
+
+/* Face details */
+.leadout-avatar::after {
+  content: "•  •";
+  position: absolute;
+  top: 19px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #24352d;
+  font-size: 8px;
+  letter-spacing: 3px;
+  line-height: 1;
+  z-index: 3;
+}
+
+/* Rainbow AI halo */
+.leadout-avatar {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.leadout-avatar > * {
+  position: relative;
+  z-index: 5;
+}
+
+/* Rainbow ring around avatar */
+.leadout-avatar {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 4px transparent,
+    0 5px 18px rgba(22, 134, 87, 0.22);
+}
+
+.leadout-avatar::marker {
+  display: none;
+}
+
+/* --------------------------------
+   LEADOUT TOGGLE
+--------------------------------- */
+
+.leadout-toggle {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #dceee4;
+  box-shadow:
+    0 8px 28px rgba(18, 72, 48, 0.16);
+}
+
+/* Rainbow glowing ring behind the avatar */
+.leadout-toggle::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #22c55e,
+    #06d6a0,
+    #00c2ff,
+    #7c3aed,
+    #ec4899,
+    #f97316,
+    #22c55e
+  );
+  z-index: -1;
+  animation: leadoutRainbowSpin 5s linear infinite;
+  filter: blur(1px);
+}
+
+/* Inner white separation */
+.leadout-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  z-index: -1;
+}
+
+/* --------------------------------
+   LARGE HEADER AVATAR
+--------------------------------- */
+
+.leadout-avatar.large {
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+  border: 2px solid #ffffff;
+  box-shadow:
+    0 0 0 3px rgba(34, 197, 94, 0.12),
+    0 0 14px rgba(34, 197, 94, 0.24);
+}
+
+/* Rainbow halo for header avatar */
+.leadout-avatar.large {
+  animation: leadoutAvatarGlow 3s ease-in-out infinite;
+}
+
+/* --------------------------------
+   ONLINE AI INDICATOR
+--------------------------------- */
+
+.leadout-online {
+  background: #20c978;
+  border: 2px solid #ffffff;
+  box-shadow:
+    0 0 0 2px rgba(32, 201, 120, 0.15),
+    0 0 10px rgba(32, 201, 120, 0.65);
+}
+
+/* --------------------------------
+   PAYACIRCLE GREEN HEADER
+--------------------------------- */
+
+.leadout-header {
+  background:
+    linear-gradient(
+      135deg,
+      #0f6f46 0%,
+      #168657 48%,
+      #20a66a 100%
+    );
+}
+
+/* --------------------------------
+   AI ANIMATIONS
+--------------------------------- */
+
+@keyframes leadoutRainbowSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes leadoutAvatarGlow {
+  0%,
+  100% {
+    filter: drop-shadow(
+      0 0 3px rgba(34, 197, 94, 0.15)
+    );
+  }
+
+  50% {
+    filter: drop-shadow(
+      0 0 9px rgba(34, 197, 94, 0.42)
+    );
+  }
+}
+
+/* --------------------------------
+   MOBILE
+--------------------------------- */
+
+@media (max-width: 600px) {
+  .leadout-avatar {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  .leadout-avatar.large {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+}
+
+/* --------------------------------
+   MODERN RECENT ACTIVITY
+--------------------------------- */
+
+.transaction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transaction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid #e5eee9;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(20, 92, 58, 0.05);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.transaction-item:hover {
+  transform: translateY(-1px);
+  border-color: #cfe4d8;
+  box-shadow: 0 8px 24px rgba(20, 92, 58, 0.08);
+}
+
+.transaction-main {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+
+.transaction-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.transaction-icon.completed {
+  background: #eaf8f1;
+  color: #168657;
+}
+
+.transaction-icon.pending {
+  background: #fff7df;
+  color: #a66a00;
+}
+
+.transaction-icon.failed {
+  background: #fff0f0;
+  color: #c43b3b;
+}
+
+.transaction-icon.refunded {
+  background: #eef7f1;
+  color: #39785b;
+}
+
+.transaction-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.transaction-details strong {
+  color: #173d2b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.transaction-circle {
+  max-width: 260px;
+  overflow: hidden;
+  color: #557365;
+  font-size: 13px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transaction-date {
+  color: #8a9b91;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.transaction-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.transaction-amount {
+  color: #173d2b;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.transaction-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.transaction-status.completed {
+  color: #168657;
+}
+
+.transaction-status.pending {
+  color: #a66a00;
+}
+
+.transaction-status.failed {
+  color: #c43b3b;
+}
+
+.transaction-status.refunded {
+  color: #39785b;
+}
+
+.transaction-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.transaction-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 20px;
+  border: 1px dashed #cfe1d7;
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    #fbfefc 0%,
+    #f5faf7 100%
+  );
+  text-align: center;
+}
+
+.transaction-empty-icon {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border-radius: 14px;
+  background: #eaf8f1;
+  color: #168657;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.transaction-empty strong {
+  color: #173d2b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.transaction-empty span {
+  max-width: 300px;
+  margin-top: 5px;
+  color: #81948a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* MOBILE */
+
+@media (max-width: 600px) {
+  .transaction-item {
+    gap: 10px;
+    padding: 14px;
+    border-radius: 15px;
+  }
+
+  .transaction-icon {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    border-radius: 12px;
+  }
+
+  .transaction-circle {
+    max-width: 160px;
+  }
+
+  .transaction-amount {
+    font-size: 14px;
+  }
+
+  .transaction-status {
+    font-size: 10px;
+  }
+}
