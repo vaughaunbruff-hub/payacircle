@@ -311,6 +311,7 @@ async function loadAccount() {
   if (!user) {
     currentUser = null;
     showPublicSite();
+     loadPublicCircles();
     return null;
   }
 
