@@ -279,10 +279,29 @@ async function loginUser(event) {
 
     closeAuthModal();
 
-    await loadAccount();
+    // Show the dashboard immediately after
+    // successful authentication.
+    renderUserInformation(user);
 
     showDashboard();
+
+    // Load memberships, payments and payouts
+    // after the dashboard is visible.
+    try {
+      await loadAccount();
+    } catch (accountError) {
+      console.error(
+        "Account data loading error:",
+        accountError
+      );
+    }
+
   } catch (error) {
+    console.error(
+      "Login error:",
+      error
+    );
+
     if (message) {
       message.textContent =
         error.message;
@@ -290,241 +309,6 @@ async function loginUser(event) {
       alert(error.message);
     }
   }
-}
-
-/* --------------------------------
-   CURRENT USER
---------------------------------- */
-
-async function getCurrentUser() {
-  try {
-    return await api("/me");
-  } catch {
-    return null;
-  }
-}
-
-async function loadAccount() {
-  const user =
-    await getCurrentUser();
-
-  if (!user) {
-    currentUser = null;
-    showPublicSite();
-     loadPublicCircles();
-    return null;
-  }
-
-  currentUser = user;
-
-  renderUserInformation(user);
-
-  renderMemberships(
-    user.memberships || []
-  );
-
-  await loadPayments();
-  await loadPayouts();
-
-  return user;
-}
-
-/* --------------------------------
-   USER INFORMATION
---------------------------------- */
-
-function renderUserInformation(user) {
-  const fullName =
-    user.name || "";
-
-  const firstName =
-    fullName.trim().split(/\s+/)[0] ||
-    "there";
-
-  const nameTargets = [
-    "#dashboardUserName",
-    "#profileMenuName",
-    "#profileName"
-  ];
-
-  nameTargets.forEach(
-    (selector) => {
-      const element = $(selector);
-
-      if (element) {
-        element.textContent =
-          fullName;
-      }
-    }
-  );
-
-  const emailTargets = [
-    "#dashboardUserEmail",
-    "#profileMenuEmail",
-    "#profileEmail"
-  ];
-
-  emailTargets.forEach(
-    (selector) => {
-      const element = $(selector);
-
-      if (element) {
-        element.textContent =
-          user.email || "";
-      }
-    }
-  );
-
-  const paypalEmail =
-    $("#profilePaypalEmail");
-
-  if (paypalEmail) {
-    paypalEmail.textContent =
-      user.paypalEmail ||
-      "Not provided";
-  }
-
-  const initials =
-    firstName.charAt(0).toUpperCase();
-
-  $$(".dashboardUserInitials")
-    .forEach((element) => {
-      element.textContent =
-        initials || "M";
-    });
-
-  const welcome =
-    $("#dashboardWelcomeName");
-
-  if (welcome) {
-    welcome.textContent =
-      firstName;
-  }
-}
-
-/* --------------------------------
-   PUBLIC / DASHBOARD
---------------------------------- */
-
-function showDashboard() {
-  hide($("#publicSite"));
-  show($("#dashboard"));
-}
-
-function showPublicSite() {
-  show($("#publicSite"));
-  hide($("#dashboard"));
-}
-
-/* --------------------------------
-   PROFILE MENU
---------------------------------- */
-
-function setupProfileMenu() {
-  const trigger =
-    $("#accountProfileTrigger");
-
-  const menu =
-    $("#accountProfileMenu");
-
-  function toggleProfileMenu(event) {
-    if (event) {
-      event.stopPropagation();
-    }
-
-    if (!menu) {
-      return;
-    }
-
-    menu.style.display =
-      menu.style.display === "block"
-        ? "none"
-        : "block";
-  }
-
-  if (trigger && menu) {
-    trigger.addEventListener(
-      "click",
-      toggleProfileMenu
-    );
-
-    document.addEventListener(
-      "click",
-      (event) => {
-        if (
-          !menu.contains(event.target) &&
-          event.target !== trigger &&
-          !trigger.contains(event.target)
-        ) {
-          hide(menu);
-        }
-      }
-    );
-  }
-
-  const mobileProfile =
-    $("#mobileProfileButton");
-
-  if (mobileProfile && menu) {
-    mobileProfile.addEventListener(
-      "click",
-      (event) => {
-        event.stopPropagation();
-
-        menu.style.display =
-          menu.style.display === "block"
-            ? "none"
-            : "block";
-      }
-    );
-  }
-}
-
-/* --------------------------------
-   LOGOUT
---------------------------------- */
-
-async function logout() {
-  try {
-    await api(
-      "/logout",
-      {
-        method: "POST"
-      }
-    );
-  } catch {
-    // Continue with local logout.
-  }
-
-  currentUser = null;
-  selectedCircle = null;
-  selectedMembership = null;
-  payoutWeekMembership = null;
-
-  localStorage.removeItem(
-    "payacircle_pending_order"
-  );
-
-  closePayoutWeekModal();
-
-  showPublicSite();
-
-  hide($("#accountProfileMenu"));
-}
-
-function setupLogout() {
-  [
-    "#dashboardLogout",
-    "#profileMenuLogout",
-    "#logoutButton"
-  ].forEach(
-    (selector) => {
-      $(selector)?.addEventListener(
-        "click",
-        logout
-      );
-    }
-  );
 }
 
 /* --------------------------------
