@@ -247,7 +247,7 @@ function tokenFor(user) {
     },
     JWT_SECRET,
     {
-      expiresIn: "7d"
+      expiresIn: "10m"
     }
   );
 }
