@@ -113,6 +113,529 @@ function hide(element) {
     element.style.display = "none";
   }
 }
+/* --------------------------------
+   ACCOUNT / DASHBOARD
+--------------------------------- */
+
+async function getCurrentUser() {
+  try {
+    return await api("/me");
+  } catch (error) {
+    if (
+      error?.status === 401 ||
+      error?.status === 403
+    ) {
+      return null;
+    }
+
+    console.error(
+      "Unable to load current user:",
+      error
+    );
+
+    return null;
+  }
+}
+
+function renderUserInformation(user) {
+  const firstName =
+    String(user?.name || "Member")
+      .trim()
+      .split(/\s+/)[0] || "Member";
+
+  const values = {
+    "#dashboardUserName":
+      user?.name || "Member",
+
+    "#dashboardUserEmail":
+      user?.email || "—",
+
+    "#dashboardWelcomeName":
+      firstName,
+
+    "#profileName":
+      user?.name || "—",
+
+    "#profileEmail":
+      user?.email || "—",
+
+    "#profilePaypalEmail":
+      user?.paypalEmail ||
+      "Not provided",
+
+    "#profileMenuName":
+      user?.name || "Member",
+
+    "#profileMenuEmail":
+      user?.email || "—"
+  };
+
+  Object.entries(values).forEach(
+    ([selector, value]) => {
+      const element = $(selector);
+
+      if (element) {
+        element.textContent = value;
+      }
+    }
+  );
+
+  const initials =
+    String(user?.name || "Member")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map(
+        (part) =>
+          part.charAt(0).toUpperCase()
+      )
+      .join("") || "M";
+
+  $$(".dashboardUserInitials")
+    .forEach((element) => {
+      element.textContent = initials;
+    });
+}
+
+function showDashboard() {
+  show($("#dashboard"));
+  hide($("#publicSite"));
+}
+
+function showPublicSite() {
+  show($("#publicSite"));
+  hide($("#dashboard"));
+}
+
+async function loadAccount() {
+  const user =
+    await getCurrentUser();
+
+  if (!user) {
+    currentUser = null;
+    showPublicSite();
+    return null;
+  }
+
+  currentUser = user;
+
+  renderUserInformation(user);
+
+  showDashboard();
+
+  renderMemberships(
+    user.memberships || []
+  );
+
+  await Promise.allSettled([
+    loadPayments(),
+    loadPayouts()
+  ]);
+
+  return user;
+}
+
+async function loadPayouts() {
+  try {
+    const payouts =
+      await api("/payouts");
+
+    const sorted =
+      [...(payouts || [])].sort(
+        (a, b) => {
+          const ad =
+            new Date(
+              a?.payoutDate?.payoutAt ||
+                0
+            ).getTime();
+
+          const bd =
+            new Date(
+              b?.payoutDate?.payoutAt ||
+                0
+            ).getTime();
+
+          return ad - bd;
+        }
+      );
+
+    const next =
+      sorted.find((payout) =>
+        [
+          "SCHEDULED",
+          "PROCESSING"
+        ].includes(
+          payout?.status
+        )
+      );
+
+    const nextAmount =
+      $("#payoutPageNextAmount");
+
+    const nextDate =
+      $("#payoutPageNextDate");
+
+    if (nextAmount) {
+      nextAmount.textContent =
+        next
+          ? money(
+              next.netAmountCents
+            )
+          : "$0.00";
+    }
+
+    if (nextDate) {
+      nextDate.textContent =
+        next
+          ? formatDateTime(
+              next.payoutDate?.payoutAt
+            )
+          : "No payout scheduled";
+    }
+
+    const overviewDate =
+      $("#overviewPayoutDate");
+
+    const overviewDetails =
+      $("#overviewPayoutDetails");
+
+    const overviewContent =
+      $("#overviewPayoutContent");
+
+    const dashboardNext =
+      $("#dashboardNextPayout");
+
+    if (overviewDate) {
+      overviewDate.textContent =
+        next
+          ? formatDate(
+              next.payoutDate?.payoutAt
+            )
+          : "No payout scheduled";
+    }
+
+    if (overviewDetails) {
+      overviewDetails.textContent =
+        next
+          ? `${money(
+              next.netAmountCents
+            )} scheduled`
+          : "No upcoming payout";
+    }
+
+    if (dashboardNext) {
+      dashboardNext.textContent =
+        next
+          ? formatDate(
+              next.payoutDate?.payoutAt
+            )
+          : "No payout scheduled";
+    }
+
+    if (overviewContent) {
+      overviewContent.textContent =
+        next
+          ? "Your next scheduled payout"
+          : "No payout scheduled";
+    }
+
+    const timeline =
+      $("#payoutTimeline");
+
+    if (timeline) {
+      timeline.innerHTML =
+        sorted.length
+          ? sorted
+              .map(
+                (payout) => `
+                  <div class="transaction-item">
+                    <div>
+                      <strong>
+                        ${escapeHTML(
+                          payout.circle?.name ||
+                            payout.circle?.code ||
+                            "PayaCircle"
+                        )}
+                      </strong>
+
+                      <span>
+                        ${escapeHTML(
+                          payout.status ||
+                            "SCHEDULED"
+                        )}
+                      </span>
+                    </div>
+
+                    <div>
+                      <strong>
+                        ${money(
+                          payout.netAmountCents
+                        )}
+                      </strong>
+
+                      <span>
+                        ${formatDateTime(
+                          payout
+                            .payoutDate
+                            ?.payoutAt
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                `
+              )
+              .join("")
+          : `
+              <div class="transaction-empty">
+                <strong>
+                  No payouts yet
+                </strong>
+
+                <span>
+                  Your scheduled payouts will appear here.
+                </span>
+              </div>
+            `;
+    }
+
+    return payouts;
+  } catch (error) {
+    console.error(
+      "Unable to load payouts:",
+      error
+    );
+
+    return [];
+  }
+}
+
+async function loadPublicCircles() {
+  try {
+    const circles =
+      await api("/circles");
+
+    const publicContainer =
+      $("#publicCircles");
+
+    const accountContainer =
+      $("#circlesPageGrid");
+
+    const containers = [
+      publicContainer,
+      accountContainer
+    ].filter(Boolean);
+
+    containers.forEach(
+      (container) => {
+        if (
+          container ===
+            accountContainer &&
+          currentUser
+        ) {
+          return;
+        }
+
+        container.innerHTML = "";
+
+        if (!circles?.length) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <h3>
+                No circles available
+              </h3>
+
+              <p>
+                Check back soon for available savings circles.
+              </p>
+            </div>
+          `;
+
+          return;
+        }
+
+        circles.forEach(
+          (circle) => {
+            const card =
+              document.createElement(
+                "div"
+              );
+
+            card.className =
+              "circle-card";
+
+            card.innerHTML = `
+              <div class="circle-card-content">
+
+                <div class="eyebrow">
+                  ${escapeHTML(
+                    circle.type ||
+                      "CIRCLE"
+                  )}
+                </div>
+
+                <h3>
+                  ${escapeHTML(
+                    circle.name ||
+                      circle.code ||
+                      "PayaCircle"
+                  )}
+                </h3>
+
+                <p>
+                  Contribution:
+                  <strong>
+                    ${money(
+                      circle.amountCents
+                    )}
+                  </strong>
+                </p>
+
+                <p>
+                  Members:
+                  <strong>
+                    ${Number(
+                      circle.membershipCount ||
+                        circle._count
+                          ?.memberships ||
+                        0
+                    )}
+                    /
+                    ${Number(
+                      circle.capacity ||
+                        0
+                    )}
+                  </strong>
+                </p>
+
+                <button
+                  class="primary full-width"
+                  type="button"
+                >
+                  Join Circle
+                </button>
+
+              </div>
+            `;
+
+            card
+              .querySelector("button")
+              ?.addEventListener(
+                "click",
+                () => {
+                  if (!currentUser) {
+                    openAuthModal(
+                      "login"
+                    );
+
+                    return;
+                  }
+
+                  openJoinCircle(
+                    circle
+                  );
+                }
+              );
+
+            container.appendChild(
+              card
+            );
+          }
+        );
+      }
+    );
+
+    return circles;
+  } catch (error) {
+    console.error(
+      "Unable to load public circles:",
+      error
+    );
+
+    return [];
+  }
+}
+
+function setupProfileMenu() {
+  const trigger =
+    $("#accountProfileTrigger");
+
+  const menu =
+    $("#accountProfileMenu");
+
+  trigger?.addEventListener(
+    "click",
+    (event) => {
+      event.stopPropagation();
+
+      if (!menu) return;
+
+      menu.style.display =
+        menu.style.display === "none" ||
+        !menu.style.display
+          ? ""
+          : "none";
+    }
+  );
+
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (
+        menu &&
+        trigger &&
+        !menu.contains(
+          event.target
+        ) &&
+        !trigger.contains(
+          event.target
+        )
+      ) {
+        hide(menu);
+      }
+    }
+  );
+
+  $("#mobileProfileButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAccountPanel(
+          "profile"
+        );
+      }
+    );
+}
+
+function setupLogout() {
+  [
+    "#dashboardLogout",
+    "#profileMenuLogout"
+  ].forEach(
+    (selector) => {
+      $(selector)?.addEventListener(
+        "click",
+        async () => {
+          try {
+            await api(
+              "/logout",
+              {
+                method: "POST"
+              }
+            );
+          } catch (error) {
+            console.error(
+              "Logout error:",
+              error
+            );
+          } finally {
+            currentUser = null;
+            showPublicSite();
+          }
+        }
+      );
+    }
+  );
+}
 
 /* --------------------------------
    AUTH MODAL
