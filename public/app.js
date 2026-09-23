@@ -613,11 +613,7 @@ function setupProfileMenu() {
           : "none";
     }
   );
-     );
-
 }
-
-function setupLogout() {
 
 function setupLogout() {
   [
