@@ -882,17 +882,21 @@ function openAccountPanel(panelName) {
 }
 
 function setupAccountNavigation() {
-  $$("[data-account-panel]")
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          openAccountPanel(
-            button.dataset.accountPanel
-          );
-        }
-      );
+  $$("[data-account-panel]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const panelName =
+        button.getAttribute("data-account-panel");
+
+      if (!panelName) {
+        return;
+      }
+
+      openAccountPanel(panelName);
     });
+  });
 }
 
 /* --------------------------------
