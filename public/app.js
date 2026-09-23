@@ -596,15 +596,23 @@ function setupProfileMenu() {
   );
 
   $("#mobileProfileButton")
-    ?.addEventListener(
-      "click",
-      () => {
-        openAccountPanel(
-          "profile"
-        );
-      }
-    );
-}
+  ?.addEventListener(
+    "click",
+    (event) => {
+      event.stopPropagation();
+
+      const menu =
+        $("#accountProfileMenu");
+
+      if (!menu) return;
+
+      menu.style.display =
+        menu.style.display === "none" ||
+        !menu.style.display
+          ? ""
+          : "none";
+    }
+  );
 
 function setupLogout() {
   [
