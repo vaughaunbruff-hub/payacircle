@@ -1981,98 +1981,259 @@ app.post(
       req.params.id;
 
     try {
+      const membership =
+        await prisma.membership.findUnique({
+          where: {
+            id:
+              membershipId
+          },
+
+          include: {
+            circle: true,
+            payoutDate: true
+          }
+        });
+
+      if (!membership) {
+        const error =
+          new Error(
+            "Membership not found"
+          );
+
+        error.status = 404;
+
+        throw error;
+      }
+
+      if (
+        membership.userId !==
+        req.user.id
+      ) {
+        const error =
+          new Error(
+            "You cannot cancel this membership"
+          );
+
+        error.status = 403;
+
+        throw error;
+      }
+
+      if (
+        membership.status ===
+          "CANCELLED" ||
+        membership.status ===
+          "REFUNDED"
+      ) {
+        const error =
+          new Error(
+            "This membership has already been cancelled"
+          );
+
+        error.status = 409;
+
+        throw error;
+      }
+
+      if (
+        membership.circle.status !==
+        "COLLECTING"
+      ) {
+        const error =
+          new Error(
+            "This circle has already started and can no longer be cancelled"
+          );
+
+        error.status = 409;
+
+        throw error;
+      }
+
+      const capturedPayment =
+        await prisma.payment.findFirst({
+          where: {
+            membershipId:
+              membership.id,
+
+            status:
+              "CAPTURED"
+          },
+
+          orderBy: {
+            createdAt:
+              "desc"
+          }
+        });
+
+      /*
+       * --------------------------------
+       * PAID MEMBERSHIP
+       * AUTOMATIC PAYPAL REFUND
+       * --------------------------------
+       */
+
+      if (capturedPayment) {
+        if (
+          !capturedPayment.paypalCaptureId
+        ) {
+          const error =
+            new Error(
+              "This payment cannot be refunded automatically because the PayPal capture could not be found."
+            );
+
+          error.status = 409;
+
+          throw error;
+        }
+
+        let refund;
+
+        try {
+          refund =
+            await paypalRequest(
+              `/v2/payments/captures/${encodeURIComponent(
+                capturedPayment.paypalCaptureId
+              )}/refund`,
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  Prefer:
+                    "return=representation",
+
+                  "PayPal-Request-Id":
+                    `PAYACIRCLE-REFUND-${capturedPayment.id}`
+                },
+
+                body:
+                  JSON.stringify({})
+              }
+            );
+        } catch (refundError) {
+          console.error(
+            "PayPal refund error:",
+            refundError
+          );
+
+          const error =
+            new Error(
+              refundError?.message ||
+                "Unable to automatically refund this payment. Please try again."
+            );
+
+          error.status =
+            refundError?.status ||
+            502;
+
+          throw error;
+        }
+
+        /*
+         * PayPal accepted the refund.
+         * Now update PayaCircle.
+         */
+
+        const result =
+          await prisma.$transaction(
+            async (tx) => {
+              const updatedPayment =
+                await tx.payment.update({
+                  where: {
+                    id:
+                      capturedPayment.id
+                  },
+
+                  data: {
+                    status:
+                      "REFUNDED"
+                  }
+                });
+
+              /*
+               * Only release a payout-date
+               * reservation if one actually exists.
+               */
+
+              if (
+                membership.payoutDateId
+              ) {
+                await tx.payoutDate.updateMany({
+                  where: {
+                    id:
+                      membership.payoutDateId,
+
+                    reserved: {
+                      gt: 0
+                    }
+                  },
+
+                  data: {
+                    reserved: {
+                      decrement: 1
+                    }
+                  }
+                });
+              }
+
+              const updatedMembership =
+                await tx.membership.update({
+                  where: {
+                    id:
+                      membership.id
+                  },
+
+                  data: {
+                    status:
+                      "REFUNDED",
+
+                    payoutDateId:
+                      null
+                  },
+
+                  include: {
+                    circle: true,
+                    payoutDate: true
+                  }
+                });
+
+              return {
+                payment:
+                  updatedPayment,
+
+                membership:
+                  updatedMembership,
+
+                refund
+              };
+            }
+          );
+
+        return res.json({
+          ok: true,
+
+          message:
+            "Your membership has been cancelled and your PayPal payment has been refunded.",
+
+          membership:
+            result.membership
+        });
+      }
+
+      /*
+       * --------------------------------
+       * UNPAID MEMBERSHIP
+       * NORMAL CANCELLATION
+       * --------------------------------
+       */
+
       const result =
         await prisma.$transaction(
           async (tx) => {
-            const membership =
-              await tx.membership.findUnique({
-                where: {
-                  id:
-                    membershipId
-                },
-
-                include: {
-                  circle: true,
-                  payoutDate: true
-                }
-              });
-
-            if (!membership) {
-              const error =
-                new Error(
-                  "Membership not found"
-                );
-
-              error.status = 404;
-
-              throw error;
-            }
-
-            if (
-              membership.userId !==
-              req.user.id
-            ) {
-              const error =
-                new Error(
-                  "You cannot cancel this membership"
-                );
-
-              error.status = 403;
-
-              throw error;
-            }
-
-            if (
-              membership.status ===
-                "CANCELLED" ||
-              membership.status ===
-                "REFUNDED"
-            ) {
-              const error =
-                new Error(
-                  "This membership has already been cancelled"
-                );
-
-              error.status = 409;
-
-              throw error;
-            }
-
-            if (
-              membership.circle.status !==
-              "COLLECTING"
-            ) {
-              const error =
-                new Error(
-                  "This circle has already started and can no longer be cancelled"
-                );
-
-              error.status = 409;
-
-              throw error;
-            }
-
-            const hasCapturedPayment =
-              await tx.payment.findFirst({
-                where: {
-                  membershipId:
-                    membership.id,
-
-                  status:
-                    "CAPTURED"
-                }
-              });
-
-            if (hasCapturedPayment) {
-              const error =
-                new Error(
-                  "This membership has already been paid. Please contact PayaCircle support to request a refund."
-                );
-
-              error.status = 409;
-
-              throw error;
-            }
+            /*
+             * Only release a payout-date
+             * reservation if one actually exists.
+             */
 
             if (
               membership.payoutDateId
@@ -2120,7 +2281,7 @@ app.post(
           }
         );
 
-      res.json({
+      return res.json({
         ok: true,
 
         message:
@@ -2130,6 +2291,11 @@ app.post(
           result
       });
     } catch (error) {
+      console.error(
+        "Cancel membership error:",
+        error
+      );
+
       res.status(
         error?.status || 400
       ).json({
