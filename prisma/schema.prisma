@@ -74,6 +74,7 @@ model Circle {
   code String @unique
   name String?
   type CircleType @default(CUSTOM)
+  isPrivate Boolean @default(false)
   amountCents Int
   capacity Int
   houseFeeCents Int @default(10000)
