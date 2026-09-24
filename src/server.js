@@ -2364,12 +2364,13 @@ app.post(
               .max(1000),
 
           amountUsd:
-            z.number()
-              .int()
-              .min(5)
-              .max(100)
-              .multipleOf(5)
-          isPrivate:
+  z.number()
+    .int()
+    .min(5)
+    .max(100)
+    .multipleOf(5),
+
+isPrivate:
   z.boolean()
     .default(false)
         })
@@ -2433,8 +2434,10 @@ app.post(
 
                   type,
 
-                  amountCents:
-                    amountUsd * 100,
+isPrivate,
+
+amountCents:
+  amountUsd * 100,
 
                   capacity,
 
