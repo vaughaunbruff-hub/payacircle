@@ -1867,28 +1867,44 @@ app.put(
 app.get(
   "/api/circles",
   async (_, res) => {
-    const circles =
-      await prisma.circle.findMany({
-        include: {
-          _count: {
-            select: {
-              memberships: {
-                where: {
-                  status: {
-                    not: "CANCELLED"
+    try {
+      const circles =
+        await prisma.circle.findMany({
+          where: {
+            isPrivate: false
+          },
+
+          include: {
+            _count: {
+              select: {
+                memberships: {
+                  where: {
+                    status: {
+                      not: "CANCELLED"
+                    }
                   }
                 }
               }
             }
+          },
+
+          orderBy: {
+            createdAt: "desc"
           }
-        },
+        });
 
-        orderBy: {
-          createdAt: "desc"
-        }
+      res.json(circles);
+    } catch (error) {
+      console.error(
+        "Public circles error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to load public circles"
       });
-
-    res.json(circles);
+    }
   }
 );
 
