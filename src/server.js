@@ -2369,6 +2369,9 @@ app.post(
               .min(5)
               .max(100)
               .multipleOf(5)
+          isPrivate:
+  z.boolean()
+    .default(false)
         })
         .safeParse(
           req.body
@@ -2382,11 +2385,12 @@ app.post(
     }
 
     const {
-      name,
-      type,
-      capacity,
-      amountUsd
-    } = parsed.data;
+  name,
+  type,
+  capacity,
+  amountUsd,
+  isPrivate
+} = parsed.data;
 
     if (
       !validContribution(
