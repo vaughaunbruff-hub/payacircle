@@ -2289,78 +2289,63 @@ function setupCircleModal() {
    CREATE CIRCLE
 --------------------------------- */
 
-async function createCircle(
-  event
-) {
+async function createCircle(event) {
   event.preventDefault();
 
-  const name =
-    $("#circleName")?.value.trim();
+  const name = $("#circleName")?.value.trim();
+  const type = $("#circleType")?.value;
+  const amountUsd = Number($("#circleAmount")?.value);
+  const capacity = Number($("#circleCapacity")?.value);
+  const isPrivate =
+    $("#circlePrivate")?.checked === true;
 
-  const type =
-    $("#circleType")?.value;
-
-  const amountUsd =
-    Number(
-      $("#circleAmount")?.value
-    );
-
-  const capacity =
-    Number(
-      $("#circleCapacity")?.value
-    );
-
-  const message =
-    $("#circleMessage");
+  const message = $("#circleMessage");
 
   if (message) {
     message.textContent = "";
   }
 
   try {
-    const result =
-      await api(
-        "/circles",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            name,
-            type,
-            amountUsd,
-            capacity
-          })
-        }
-      );
+    const result = await api("/circles", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        type,
+        amountUsd,
+        capacity,
+        isPrivate
+      })
+    });
 
     selectedCircle =
-      result;
+      result.circle || result;
 
     selectedMembership =
-      result.membership ||
-      null;
+      result.membership || null;
 
     closeCircleModal();
 
     if (message) {
-      message.textContent =
-        "";
+      message.textContent = "";
     }
 
     await loadAccount();
 
-    if (
-      result.membership
-    ) {
+    if (result.membership) {
       await openPaymentPanel(
-        result,
+        result.circle || result,
         result.membership
       );
     } else {
-      alert(
-        "Circle created successfully."
-      );
+      alert("Circle created successfully.");
     }
+
   } catch (error) {
+    console.error(
+      "Create circle error:",
+      error
+    );
+
     if (message) {
       message.textContent =
         error.message;
