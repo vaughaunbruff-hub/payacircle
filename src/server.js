@@ -1914,6 +1914,7 @@ app.get(
 
 app.get(
   "/api/circles/:id",
+  auth,
   async (req, res) => {
     const circle =
       await prisma.circle.findUnique({
@@ -1941,6 +1942,26 @@ app.get(
         error:
           "Circle not found"
       });
+    }
+
+    if (circle.isPrivate) {
+      const membership =
+        await prisma.membership.findFirst({
+          where: {
+            circleId: circle.id,
+            userId: req.user.id,
+            status: {
+              not: "CANCELLED"
+            }
+          }
+        });
+
+      if (!membership) {
+        return res.status(403).json({
+          error:
+            "This is a private circle. You need an invitation to access it."
+        });
+      }
     }
 
     res.json(circle);
