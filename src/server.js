@@ -2732,6 +2732,240 @@ app.post(
     }
   }
 );
+/* --------------------------------
+   ACCEPT CIRCLE INVITE
+--------------------------------- */
+
+app.post(
+  "/api/circles/invites/:token/accept",
+  auth,
+  async (req, res) => {
+    try {
+      const invite =
+        await prisma.circleInvite.findUnique({
+          where: {
+            token:
+              req.params.token
+          },
+
+          include: {
+            circle: true
+          }
+        });
+
+      if (!invite) {
+        return res.status(404).json({
+          error:
+            "Invitation not found"
+        });
+      }
+
+      if (
+        invite.status !==
+        "PENDING"
+      ) {
+        return res.status(400).json({
+          error:
+            "This invitation is no longer available"
+        });
+      }
+
+      if (
+        invite.expiresAt &&
+        invite.expiresAt <
+          new Date()
+      ) {
+        await prisma.circleInvite.update({
+          where: {
+            id:
+              invite.id
+          },
+
+          data: {
+            status:
+              "EXPIRED"
+          }
+        });
+
+        return res.status(400).json({
+          error:
+            "This invitation has expired"
+        });
+      }
+
+      const user =
+        await prisma.user.findUnique({
+          where: {
+            id:
+              req.user.id
+          }
+        });
+
+      if (!user) {
+        return res.status(401).json({
+          error:
+            "Your account could not be found"
+        });
+      }
+
+      if (
+        user.email.toLowerCase() !==
+        invite.email.toLowerCase()
+      ) {
+        return res.status(403).json({
+          error:
+            "This invitation was sent to a different email address"
+        });
+      }
+
+      const circle =
+        invite.circle;
+
+      if (
+        circle.status !==
+        "COLLECTING"
+      ) {
+        return res.status(400).json({
+          error:
+            "This circle is no longer accepting new members"
+        });
+      }
+
+      const existing =
+        await prisma.membership.findUnique({
+          where: {
+            userId_circleId: {
+              userId:
+                user.id,
+
+              circleId:
+                circle.id
+            }
+          }
+        });
+
+      if (
+        existing &&
+        existing.status !==
+        "CANCELLED"
+      ) {
+        await prisma.circleInvite.update({
+          where: {
+            id:
+              invite.id
+          },
+
+          data: {
+            status:
+              "ACCEPTED"
+          }
+        });
+
+        return res.json({
+          message:
+            "Invitation accepted",
+          circle,
+          membership:
+            existing
+        });
+      }
+
+      const activeMemberCount =
+        await prisma.membership.count({
+          where: {
+            circleId:
+              circle.id,
+
+            status: {
+              not: "CANCELLED"
+            }
+          }
+        });
+
+      if (
+        activeMemberCount >=
+        circle.capacity
+      ) {
+        return res.status(409).json({
+          error:
+            "Circle is full"
+        });
+      }
+
+      const membership =
+        existing
+          ? await prisma.membership.update({
+              where: {
+                id:
+                  existing.id
+              },
+
+              data: {
+                payoutDateId:
+                  null,
+
+                status:
+                  "PAYMENT_PENDING"
+              },
+
+              include: {
+                circle: true,
+                payoutDate: true
+              }
+            })
+          : await prisma.membership.create({
+              data: {
+                userId:
+                  user.id,
+
+                circleId:
+                  circle.id,
+
+                payoutDateId:
+                  null,
+
+                status:
+                  "PAYMENT_PENDING"
+              },
+
+              include: {
+                circle: true,
+                payoutDate: true
+              }
+            });
+
+      await prisma.circleInvite.update({
+        where: {
+          id:
+            invite.id
+        },
+
+        data: {
+          status:
+            "ACCEPTED"
+        }
+      });
+
+      res.status(201).json({
+        message:
+          "Invitation accepted",
+        circle,
+        membership
+      });
+
+    } catch (error) {
+      console.error(
+        "Accept circle invite error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to accept invitation"
+      });
+    }
+  }
+);
 
 /* --------------------------------
    JOIN / RESERVE MEMBERSHIP
