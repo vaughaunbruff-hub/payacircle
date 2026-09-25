@@ -1013,146 +1013,182 @@ function renderMemberships(
             );
 
           card.innerHTML = `
-            <div class="circle-card-content">
+  <div class="circle-card-content">
 
-              <div class="eyebrow">
-                ${escapeHTML(
-                  circle?.type ||
-                    "CIRCLE"
-                )}
-              </div>
+    <div class="eyebrow">
+      ${escapeHTML(
+        circle?.type ||
+          "CIRCLE"
+      )}
+    </div>
 
-              <h3>
-                ${escapeHTML(
-                  circle?.name ||
-                    circle?.code ||
-                    "PayaCircle"
-                )}
-              </h3>
+    <h3>
+      ${escapeHTML(
+        circle?.name ||
+          circle?.code ||
+          "PayaCircle"
+      )}
+    </h3>
 
-              <p>
-                Contribution:
-                <strong>
-                  ${money(amount)}
-                </strong>
-              </p>
+    <p>
+      Contribution:
+      <strong>
+        ${money(amount)}
+      </strong>
+    </p>
 
-              <p>
-                Status:
-                <strong>
-                  ${escapeHTML(
-                    membershipStatusLabel(
-                      status
-                    )
-                  )}
-                </strong>
-              </p>
+    <p>
+      Status:
+      <strong>
+        ${escapeHTML(
+          membershipStatusLabel(
+            status
+          )
+        )}
+      </strong>
+    </p>
 
-              ${
-                membership.payoutDate
-                  ? `
-                    <p>
-                      Payout:
-                      <strong>
-                        ${formatDate(
-                          membership
-                            .payoutDate
-                            .payoutAt
-                        )}
-                      </strong>
-                    </p>
-                  `
-                  : ""
-              }
+    <p>
+      Visibility:
+      <strong>
+        ${
+          circle?.isPrivate
+            ? "Private"
+            : "Public"
+        }
+      </strong>
+    </p>
 
-              ${
-                needsPayoutSelection
-                  ? `
-                    <div class="payout-selection-notice">
-                      <strong>
-                        Your circle is full!
-                      </strong>
+    ${
+      membership.payoutDate
+        ? `
+          <p>
+            Payout:
+            <strong>
+              ${formatDate(
+                membership
+                  .payoutDate
+                  .payoutAt
+              )}
+            </strong>
+          </p>
+        `
+        : ""
+    }
 
-                      <p>
-                        Your weekly payout schedule is ready.
-                        Choose your preferred payout week.
-                      </p>
-                    </div>
-                  `
-                  : ""
-              }
+    ${
+      needsPayoutSelection
+        ? `
+          <div class="payout-selection-notice">
+            <strong>
+              Your circle is full!
+            </strong>
 
-              <div class="circle-card-actions">
+            <p>
+              Your weekly payout schedule is ready.
+              Choose your preferred payout week.
+            </p>
+          </div>
+        `
+        : ""
+    }
 
-                <button
-                  class="ghost view-circle-button"
-                  data-circle-id="${escapeHTML(
-                    circle?.id || ""
-                  )}"
-                >
-                  View Circle
-                </button>
+    <div class="circle-card-actions">
 
-                ${
-                  status ===
-                  "PAYMENT_PENDING"
-                    ? `
-                      <button
-                        class="primary pay-membership-button"
-                        data-membership-id="${escapeHTML(
-                          membership.id
-                        )}"
-                        data-circle-id="${escapeHTML(
-                          circle?.id || ""
-                        )}"
-                      >
-                        Make Payment
-                      </button>
-                    `
-                    : ""
-                }
+      <button
+        class="ghost view-circle-button"
+        data-circle-id="${escapeHTML(
+          circle?.id || ""
+        )}"
+        type="button"
+      >
+        View Circle
+      </button>
 
-                ${
-                  needsPayoutSelection
-                    ? `
-                      <button
-                        class="primary choose-payout-button"
-                        data-membership-id="${escapeHTML(
-                          membership.id
-                        )}"
-                        data-circle-id="${escapeHTML(
-                          circle?.id || ""
-                        )}"
-                      >
-                        Choose Payout Week
-                      </button>
-                    `
-                    : ""
-                }
+      ${
+        status ===
+        "PAYMENT_PENDING"
+          ? `
+            <button
+              class="primary pay-membership-button"
+              data-membership-id="${escapeHTML(
+                membership.id
+              )}"
+              data-circle-id="${escapeHTML(
+                circle?.id || ""
+              )}"
+              type="button"
+            >
+              Make Payment
+            </button>
+          `
+          : ""
+      }
 
-                ${
-                  status !==
-                    "CANCELLED" &&
-                  status !==
-                    "REFUNDED" &&
-                  status !==
-                    "PAID_OUT"
-                    ? `
-                      <button
-                        class="ghost cancel-membership-button"
-                        data-membership-id="${escapeHTML(
-                          membership.id
-                        )}"
-                      >
-                        Cancel Membership
-                      </button>
-                    `
-                    : ""
-                }
+      ${
+        circle?.isPrivate &&
+        (
+          status === "PAID" ||
+          status === "PAYOUT_SCHEDULED" ||
+          status === "PAID_OUT"
+        )
+          ? `
+            <button
+              class="ghost invite-circle-button"
+              data-circle-id="${escapeHTML(
+                circle?.id || ""
+              )}"
+              type="button"
+            >
+              Invite
+            </button>
+          `
+          : ""
+      }
 
-              </div>
-            </div>
-          `;
+      ${
+        needsPayoutSelection
+          ? `
+            <button
+              class="primary choose-payout-button"
+              data-membership-id="${escapeHTML(
+                membership.id
+              )}"
+              data-circle-id="${escapeHTML(
+                circle?.id || ""
+              )}"
+              type="button"
+            >
+              Choose Payout Week
+            </button>
+          `
+          : ""
+      }
+
+      ${
+        status !==
+          "CANCELLED" &&
+        status !==
+          "REFUNDED" &&
+        status !==
+          "PAID_OUT"
+          ? `
+            <button
+              class="ghost cancel-membership-button"
+              data-membership-id="${escapeHTML(
+                membership.id
+              )}"
+              type="button"
+            >
+              Cancel Membership
+            </button>
+          `
+          : ""
+      }
+
+    </div>
+  </div>
+`;
 
           container.appendChild(
             card
@@ -1161,7 +1197,7 @@ function renderMemberships(
       );
     }
   );
-
+   
   $$(".view-circle-button")
     .forEach((button) => {
       button.addEventListener(
@@ -1173,7 +1209,78 @@ function renderMemberships(
         }
       );
     });
+   
+$$(".invite-circle-button")
+  .forEach((button) => {
+    button.addEventListener(
+      "click",
+      async () => {
+        const circleId =
+          button.dataset.circleId;
 
+        if (!circleId) {
+          return;
+        }
+
+        const email =
+          window.prompt(
+            "Enter the email address of the person you want to invite:"
+          );
+
+        if (!email) {
+          return;
+        }
+
+        try {
+          const result =
+            await api(
+              `/circles/${encodeURIComponent(
+                circleId
+              )}/invites`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  email:
+                    email.trim()
+                })
+              }
+            );
+
+          const inviteLink =
+            `${window.location.origin}/?invite=${encodeURIComponent(
+              result.token
+            )}`;
+
+          try {
+            await navigator.clipboard.writeText(
+              inviteLink
+            );
+
+            alert(
+              `Invitation created for ${result.email}.\n\nThe invitation link has been copied to your clipboard.`
+            );
+          } catch {
+            window.prompt(
+              "Invitation created. Copy this invitation link:",
+              inviteLink
+            );
+          }
+
+        } catch (error) {
+          console.error(
+            "Invite error:",
+            error
+          );
+
+          alert(
+            error.message ||
+              "Unable to create invitation."
+          );
+        }
+      }
+    );
+  });
+   
   $$(".pay-membership-button")
     .forEach((button) => {
       button.addEventListener(
