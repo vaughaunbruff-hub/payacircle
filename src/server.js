@@ -1914,7 +1914,6 @@ app.get(
 
 app.get(
   "/api/circles/:id",
-  auth,
   async (req, res) => {
     const circle =
       await prisma.circle.findUnique({
