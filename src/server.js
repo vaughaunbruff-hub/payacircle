@@ -2542,6 +2542,195 @@ amountCents:
     }
   }
 );
+app.post(
+  "/api/circles/:id/invites",
+  auth,
+  async (req, res) => {
+    const parsed =
+      z
+        .object({
+          email: z
+            .string()
+            .trim()
+            .email()
+            .transform(
+              (value) =>
+                value.toLowerCase()
+            )
+        })
+        .safeParse(
+          req.body
+        );
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error:
+          "Please enter a valid email address"
+      });
+    }
+
+    try {
+      const circle =
+        await prisma.circle.findUnique({
+          where: {
+            id: req.params.id
+          }
+        });
+
+      if (!circle) {
+        return res.status(404).json({
+          error:
+            "Circle not found"
+        });
+      }
+
+      if (!circle.isPrivate) {
+        return res.status(400).json({
+          error:
+            "Invites are only available for private circles"
+        });
+      }
+
+      const ownerMembership =
+        await prisma.membership.findFirst({
+          where: {
+            circleId:
+              circle.id,
+
+            userId:
+              req.user.id,
+
+            status: {
+              not: "CANCELLED"
+            }
+          }
+        });
+
+      if (!ownerMembership) {
+        return res.status(403).json({
+          error:
+            "You must be a member of this private circle to send invites"
+        });
+      }
+
+      if (
+        ownerMembership.status !==
+          "PAID" &&
+        ownerMembership.status !==
+          "PAYOUT_SCHEDULED" &&
+        ownerMembership.status !==
+          "PAID_OUT"
+      ) {
+        return res.status(403).json({
+          error:
+            "You must complete your circle payment before sending invites"
+        });
+      }
+
+      const email =
+        parsed.data.email;
+
+      const existingUser =
+        await prisma.user.findUnique({
+          where: {
+            email
+          }
+        });
+
+      if (existingUser) {
+        const existingMembership =
+          await prisma.membership.findUnique({
+            where: {
+              userId_circleId: {
+                userId:
+                  existingUser.id,
+
+                circleId:
+                  circle.id
+              }
+            }
+          });
+
+        if (
+          existingMembership &&
+          existingMembership.status !==
+            "CANCELLED"
+        ) {
+          return res.status(409).json({
+            error:
+              "This person is already a member of the circle"
+          });
+        }
+      }
+
+      const existingInvite =
+        await prisma.circleInvite.findFirst({
+          where: {
+            circleId:
+              circle.id,
+
+            email,
+
+            status:
+              "PENDING"
+          }
+        });
+
+      if (existingInvite) {
+        return res.status(409).json({
+          error:
+            "An invitation has already been sent to this email address"
+        });
+      }
+
+      const token =
+        `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+
+      const invite =
+        await prisma.circleInvite.create({
+          data: {
+            circleId:
+              circle.id,
+
+            email,
+
+            token,
+
+            status:
+              "PENDING",
+
+            expiresAt:
+              new Date(
+                Date.now() +
+                  7 *
+                    24 *
+                    60 *
+                    60 *
+                    1000
+              )
+          }
+        });
+
+      res.status(201).json({
+        id: invite.id,
+        email: invite.email,
+        token: invite.token,
+        expiresAt:
+          invite.expiresAt
+      });
+    } catch (error) {
+      console.error(
+        "Create circle invite error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Unable to create invitation"
+      });
+    }
+  }
+);
 
 /* --------------------------------
    JOIN / RESERVE MEMBERSHIP
