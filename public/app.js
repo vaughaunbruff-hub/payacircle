@@ -3279,6 +3279,9 @@ async function init() {
   const hasPayPalReturn =
     paypalParams.has("paypal") ||
     paypalParams.has("token");
+   
+     const inviteToken =
+    paypalParams.get("invite");
 
   const user =
     await getCurrentUser();
@@ -3293,7 +3296,51 @@ async function init() {
     renderMemberships(
       user.memberships || []
     );
+     
+    if (inviteToken) {
+      try {
+        const result =
+          await api(
+            `/circles/invites/${encodeURIComponent(
+              inviteToken
+            )}/accept`,
+            {
+              method: "POST"
+            }
+          );
 
+        alert(
+          result.message ||
+            "Invitation accepted successfully."
+        );
+
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+
+        await loadAccount();
+
+      } catch (error) {
+        console.error(
+          "Invite acceptance error:",
+          error
+        );
+
+        alert(
+          error.message ||
+            "Unable to accept this invitation."
+        );
+
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+      }
+    }
+     
     try {
       await loadPayments();
       await loadPayouts();
