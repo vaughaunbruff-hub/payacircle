@@ -86,8 +86,27 @@ model Circle {
   payoutDates PayoutDate[]
   payments Payment[]
   payouts Payout[]
+  invites CircleInvite[]
+
 }
 
+model CircleInvite {
+  id String @id @default(cuid())
+
+  circleId String
+  email String
+  token String @unique
+
+  status String @default("PENDING")
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  circle Circle @relation(fields: [circleId], references: [id])
+
+  @@index([circleId])
+  @@index([email])
+}
 model PayoutDate {
   id String @id @default(cuid())
   circleId String
