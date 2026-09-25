@@ -2572,26 +2572,73 @@
 
         <label>
 
-          Number of members
+  Number of members
 
-          <input
-            id="circleCapacity"
-            type="number"
-            min="2"
-            max="1000"
-            value="10"
-            required
-          >
+  <input
+    id="circleCapacity"
+    type="number"
+    min="2"
+    max="1000"
+    value="10"
+    required
+  >
 
-        </label>
+</label>
 
 
-        <button
-          type="submit"
-          class="primary full-width"
-        >
-          Create Circle
-        </button>
+<fieldset class="visibility-options">
+
+  <legend>Circle visibility</legend>
+
+  <label class="visibility-option">
+
+    <input
+      type="radio"
+      name="circleVisibility"
+      id="circlePublic"
+      value="public"
+      checked
+    >
+
+    <span>
+      <strong>Public</strong>
+
+      <small>
+        Anyone can find this circle on the PayaCircle homepage.
+      </small>
+    </span>
+
+  </label>
+
+
+  <label class="visibility-option">
+
+    <input
+      type="radio"
+      name="circleVisibility"
+      id="circlePrivate"
+      value="private"
+    >
+
+    <span>
+      <strong>Private</strong>
+
+      <small>
+        Only people you invite can access this circle.
+      </small>
+    </span>
+
+  </label>
+
+</fieldset>
+
+
+<button
+  type="submit"
+  class="primary full-width"
+>
+  Create Circle
+</button>
 
 
         <div
