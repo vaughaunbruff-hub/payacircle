@@ -1944,18 +1944,41 @@ app.get(
     }
 
     if (circle.isPrivate) {
-      const membership =
-        await prisma.membership.findFirst({
-          where: {
-            circleId: circle.id,
-            userId: req.user.id,
-            status: {
-              not: "CANCELLED"
-            }
-          }
-        });
+      const token =
+        req.cookies.cp_session;
 
-      if (!membership) {
+      if (!token) {
+        return res.status(403).json({
+          error:
+            "This is a private circle. You need an invitation to access it."
+        });
+      }
+
+      try {
+        const decoded =
+          jwt.verify(
+            token,
+            JWT_SECRET
+          );
+
+        const membership =
+          await prisma.membership.findFirst({
+            where: {
+              circleId: circle.id,
+              userId: decoded.id,
+              status: {
+                not: "CANCELLED"
+              }
+            }
+          });
+
+        if (!membership) {
+          return res.status(403).json({
+            error:
+              "This is a private circle. You need an invitation to access it."
+          });
+        }
+      } catch {
         return res.status(403).json({
           error:
             "This is a private circle. You need an invitation to access it."
