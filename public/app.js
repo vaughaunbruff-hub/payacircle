@@ -1126,25 +1126,22 @@ function renderMemberships(
       }
 
       ${
-        circle?.isPrivate &&
-        (
-          status === "PAID" ||
-          status === "PAYOUT_SCHEDULED" ||
-          status === "PAID_OUT"
-        )
-          ? `
-            <button
-              class="ghost invite-circle-button"
-              data-circle-id="${escapeHTML(
-                circle?.id || ""
-              )}"
-              type="button"
-            >
-              Invite
-            </button>
-          `
-          : ""
-      }
+  circle?.isPrivate &&
+  status !== "CANCELLED" &&
+  status !== "REFUNDED"
+    ? `
+      <button
+        class="ghost invite-circle-button"
+        data-circle-id="${escapeHTML(
+          circle?.id || ""
+        )}"
+        type="button"
+      >
+        Invite
+      </button>
+    `
+    : ""
+}
 
       ${
         needsPayoutSelection
