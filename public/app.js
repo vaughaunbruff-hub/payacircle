@@ -1123,10 +1123,14 @@ function openAccountPanel(panelName) {
   hide($("#accountProfileMenu"));
 
   if (
-    panelName === "circles"
-  ) {
-    loadPublicCircles();
+  panelName === "circles"
+) {
+  if (currentUser) {
+    renderMemberships(
+      currentUser.memberships || []
+    );
   }
+}
 
   if (
     panelName === "payments" ||
