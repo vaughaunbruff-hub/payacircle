@@ -3235,17 +3235,25 @@ function cancelPayment() {
 }
 
 function setupPayment() {
-  $("#paypalButton")
-    ?.addEventListener(
+  const paypalButton =
+    $("#paypalButton");
+
+  const cancelButton =
+    $("#cancelPayment");
+
+  if (paypalButton) {
+    paypalButton.addEventListener(
       "click",
       startPayPalPayment
     );
+  }
 
-  $("#cancelPayment")
-    ?.addEventListener(
+  if (cancelButton) {
+    cancelButton.addEventListener(
       "click",
       cancelPayment
     );
+  }
 }
 
 /* --------------------------------
