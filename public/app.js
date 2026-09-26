@@ -1350,25 +1350,24 @@ function renderMemberships(
       </button>
 
       ${
-        status ===
-        "PAYMENT_PENDING"
-          ? `
-            <button
-  class="primary pay-membership-button"
-  data-membership-id="${escapeHTML(
-    membership.id
-  )}"
-  data-circle-id="${escapeHTML(
-    circle?.id || ""
-  )}"
-  type="button"
-  onclick="window.payPayaCircleMembership(this)"
->
-  Make Payment
-</button>
-
-      ${
-  circle?.isPrivate &&
+  status ===
+  "PAYMENT_PENDING"
+    ? `
+      <button
+        class="primary pay-membership-button"
+        data-membership-id="${escapeHTML(
+          membership.id
+        )}"
+        data-circle-id="${escapeHTML(
+          circle?.id || ""
+        )}"
+        type="button"
+      >
+        Make Payment
+      </button>
+    `
+    : ""
+}
   status !== "CANCELLED" &&
   status !== "REFUNDED"
     ? `
