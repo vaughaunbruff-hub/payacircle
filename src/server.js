@@ -2614,20 +2614,6 @@ app.post(
         });
       }
 
-      if (
-        ownerMembership.status !==
-          "PAID" &&
-        ownerMembership.status !==
-          "PAYOUT_SCHEDULED" &&
-        ownerMembership.status !==
-          "PAID_OUT"
-      ) {
-        return res.status(403).json({
-          error:
-            "You must complete your circle payment before sending invites"
-        });
-      }
-
       const email =
         parsed.data.email;
 
