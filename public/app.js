@@ -3322,13 +3322,30 @@ function setupPayment() {
       event.stopPropagation();
 
       const membershipId =
-        button.dataset.membershipId;
+        button.getAttribute(
+          "data-membership-id"
+        );
 
       const circleId =
-        button.dataset.circleId;
+        button.getAttribute(
+          "data-circle-id"
+        );
+
+      if (!membershipId) {
+        alert(
+          "This membership could not be identified. Please refresh the page and try again."
+        );
+
+        return;
+      }
+
+      if (!currentUser) {
+        openAuthModal("login");
+        return;
+      }
 
       const membership =
-        currentUser?.memberships?.find(
+        (currentUser.memberships || []).find(
           (item) =>
             String(item.id) ===
             String(membershipId)
@@ -3344,7 +3361,7 @@ function setupPayment() {
 
       const circle =
         membership.circle ||
-        currentUser?.memberships?.find(
+        (currentUser.memberships || []).find(
           (item) =>
             String(item.circle?.id) ===
             String(circleId)
@@ -3377,19 +3394,15 @@ function setupPayment() {
   const cancelButton =
     $("#cancelPayment");
 
-  if (paypalButton) {
-    paypalButton.addEventListener(
-      "click",
-      startPayPalPayment
-    );
-  }
+  paypalButton?.addEventListener(
+    "click",
+    startPayPalPayment
+  );
 
-  if (cancelButton) {
-    cancelButton.addEventListener(
-      "click",
-      cancelPayment
-    );
-  }
+  cancelButton?.addEventListener(
+    "click",
+    cancelPayment
+  );
 }
 
 /* --------------------------------
