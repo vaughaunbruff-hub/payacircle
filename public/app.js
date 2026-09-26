@@ -414,12 +414,6 @@ async function loadPublicCircles() {
     const circles = await api("/circles");
 
     const publicContainer = $("#publicCircles");
-    const accountContainer = $("#circlesPageGrid");
-
-    const containers = [
-      publicContainer,
-      accountContainer
-    ].filter(Boolean);
 
     const typeLabels = {
       FAMILY: "Family",
@@ -428,120 +422,366 @@ async function loadPublicCircles() {
       CUSTOM: "Custom"
     };
 
-    containers.forEach((container) => {
-      if (container === accountContainer && currentUser) {
-        return;
-      }
+    if (publicContainer) {
+  publicContainer.innerHTML = "";
 
-      container.innerHTML = "";
+  if (!circles?.length) {
+    publicContainer.innerHTML = `
+      <div class="circle-hub-empty">
+        <div class="circle-hub-core">
+          P
+        </div>
 
-      if (!circles?.length) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <h3>No circles available</h3>
-            <p>
-              Check back soon for available savings circles.
-            </p>
-          </div>
-        `;
-        return;
-      }
+        <strong>
+          No public circles available yet
+        </strong>
 
-      circles.forEach((circle) => {
-        const memberCount = Number(
-          circle.membershipCount ??
-          circle._count?.memberships ??
-          0
-        );
+        <span>
+          Check back soon for new PayaCircle circles.
+        </span>
+      </div>
+    `;
 
-        const capacity = Number(circle.capacity || 0);
+  } else {
+    const displayCircles =
+      circles.slice(0, 8);
 
-        const isFull =
-          capacity > 0 &&
-          memberCount >= capacity;
+    publicContainer.innerHTML = `
+      <div class="circle-hub">
 
-        const isJoinable =
-          !isFull &&
-          circle.status === "COLLECTING";
+        <div class="circle-hub-glow"></div>
 
-        const planLabel =
-          typeLabels[circle.type] ||
-          "Custom";
+        <div class="circle-hub-ring ring-one"></div>
+        <div class="circle-hub-ring ring-two"></div>
 
-        const card =
-          document.createElement("div");
+        <button
+          class="circle-hub-core"
+          id="circleHubCore"
+          type="button"
+        >
+          <span class="circle-hub-core-mark">
+            P
+          </span>
 
-        card.className = "circle-card";
+          <strong>
+            Explore<br>
+            Circles
+          </strong>
 
-        card.innerHTML = `
-          <div class="circle-card-content">
+          <small>
+            ${circles.length} available
+          </small>
+        </button>
 
-            <div class="eyebrow">
-              ${escapeHTML(planLabel)}
+        <div class="circle-hub-orbit">
+
+          ${displayCircles
+            .map((circle, index) => {
+
+              const label =
+                typeLabels[circle.type] ||
+                "Custom";
+
+              const memberCount =
+                Number(
+                  circle.membershipCount ??
+                  circle._count?.memberships ??
+                  0
+                );
+
+              const capacity =
+                Number(
+                  circle.capacity || 0
+                );
+
+              const isFull =
+                capacity > 0 &&
+                memberCount >= capacity;
+
+              return `
+                <button
+                  class="circle-hub-node ${
+                    isFull
+                      ? "is-full"
+                      : ""
+                  }"
+                  style="
+                    --hub-angle: ${
+                      index *
+                      (
+                        360 /
+                        displayCircles.length
+                      )
+                    }deg;
+                  "
+                  data-hub-circle-id="${escapeHTML(
+                    circle.id || ""
+                  )}"
+                  type="button"
+                  ${
+                    isFull
+                      ? "disabled"
+                      : ""
+                  }
+                >
+
+                  <span
+                    class="circle-hub-node-icon"
+                  >
+                    ${escapeHTML(
+                      label.charAt(0)
+                    )}
+                  </span>
+
+                  <strong>
+                    ${escapeHTML(
+                      circle.name ||
+                      label
+                    )}
+                  </strong>
+
+                  <small>
+                    ${
+                      isFull
+                        ? "Full"
+                        : escapeHTML(
+                            label
+                          )
+                    }
+                  </small>
+
+                </button>
+              `;
+            })
+            .join("")}
+
+        </div>
+
+        <div
+          class="circle-hub-panel"
+          id="circleHubPanel"
+          aria-hidden="true"
+        >
+
+          <div class="circle-hub-panel-head">
+
+            <div>
+              <span class="eyebrow">
+                CIRCLE SELECTED
+              </span>
+
+              <h3 id="circleHubTitle">
+                Choose a circle
+              </h3>
             </div>
 
-            <h3>
-              ${escapeHTML(
-                circle.name ||
-                planLabel ||
-                circle.code ||
-                "PayaCircle"
-              )}
-            </h3>
-
-            <p>
-              Contribution:
-              <strong>
-                ${money(circle.amountCents)}
-              </strong>
-            </p>
-
-            <p>
-              Members:
-              <strong>
-                ${memberCount} / ${capacity}
-              </strong>
-            </p>
-
             <button
-              class="${
-                isJoinable
-                  ? "primary"
-                  : "secondary-button"
-              } full-width"
+              id="circleHubClose"
               type="button"
-              ${isJoinable ? "" : "disabled"}
+              aria-label="Close"
             >
-              ${
-                isFull
-                  ? "Circle Full"
-                  : circle.status !== "COLLECTING"
-                    ? "Not Available"
-                    : "Join Circle"
-              }
+              ×
             </button>
 
           </div>
+
+          <div id="circleHubDetails"></div>
+
+          <button
+            id="circleHubJoin"
+            class="primary full-width"
+            type="button"
+          >
+            Join Circle
+          </button>
+
+        </div>
+
+      </div>
+    `;
+
+    let selectedHubCircle =
+      null;
+
+    const panel =
+      $("#circleHubPanel");
+
+    const details =
+      $("#circleHubDetails");
+
+    const title =
+      $("#circleHubTitle");
+
+    const join =
+      $("#circleHubJoin");
+
+    const openHubCircle =
+      (circle) => {
+
+        selectedHubCircle =
+          circle;
+
+        const label =
+          typeLabels[circle.type] ||
+          "Custom";
+
+        const memberCount =
+          Number(
+            circle.membershipCount ??
+            circle._count?.memberships ??
+            0
+          );
+
+        const capacity =
+          Number(
+            circle.capacity || 0
+          );
+
+        title.textContent =
+          circle.name ||
+          label;
+
+        details.innerHTML = `
+          <div
+            class="circle-hub-detail-grid"
+          >
+
+            <div>
+              <span>Plan</span>
+              <strong>
+                ${escapeHTML(label)}
+              </strong>
+            </div>
+
+            <div>
+              <span>Contribution</span>
+              <strong>
+                ${money(
+                  circle.amountCents
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Members</span>
+              <strong>
+                ${memberCount} /
+                ${capacity}
+              </strong>
+            </div>
+
+          </div>
+
+          <p>
+            Join this savings circle and
+            manage your contribution and
+            payout schedule from your
+            PayaCircle account.
+          </p>
         `;
 
-        if (isJoinable) {
-          card
-            .querySelector("button")
-            ?.addEventListener("click", () => {
-              if (!currentUser) {
-                openAuthModal("login");
-                return;
-              }
+        join.disabled =
+          capacity > 0 &&
+          memberCount >= capacity;
 
-              openJoinCircle(circle);
-            });
+        join.textContent =
+          join.disabled
+            ? "Circle Full"
+            : "Join Circle";
+
+        panel?.classList.add(
+          "open"
+        );
+
+        panel?.setAttribute(
+          "aria-hidden",
+          "false"
+        );
+      };
+
+    $$(".circle-hub-node")
+      .forEach((node) => {
+
+        node.addEventListener(
+          "click",
+          () => {
+
+            const circle =
+              circles.find(
+                (item) =>
+                  item.id ===
+                  node.dataset
+                    .hubCircleId
+              );
+
+            if (circle) {
+              openHubCircle(circle);
+            }
+          }
+        );
+      });
+
+    $("#circleHubCore")
+      ?.addEventListener(
+        "click",
+        () => {
+
+          panel?.classList.toggle(
+            "open"
+          );
+
+          panel?.setAttribute(
+            "aria-hidden",
+            panel?.classList.contains(
+              "open"
+            )
+              ? "false"
+              : "true"
+          );
+        }
+      );
+
+    $("#circleHubClose")
+      ?.addEventListener(
+        "click",
+        () => {
+
+          panel?.classList.remove(
+            "open"
+          );
+
+          panel?.setAttribute(
+            "aria-hidden",
+            "true"
+          );
+        }
+      );
+
+    join?.addEventListener(
+      "click",
+      () => {
+
+        if (
+          !selectedHubCircle ||
+          join.disabled
+        ) {
+          return;
         }
 
-        container.appendChild(card);
-      });
-    });
+        if (!currentUser) {
+          openAuthModal("login");
+          return;
+        }
 
-    return circles;
+        openJoinCircle(
+          selectedHubCircle
+        );
+      }
+    );
+  }
+}
+
+return circles;
 
   } catch (error) {
     console.error(
