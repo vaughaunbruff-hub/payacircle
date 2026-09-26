@@ -1368,6 +1368,8 @@ function renderMemberships(
     `
     : ""
 }
+  ${
+  circle?.isPrivate &&
   status !== "CANCELLED" &&
   status !== "REFUNDED"
     ? `
