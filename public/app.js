@@ -1521,37 +1521,6 @@ $$(".invite-circle-button")
       }
     );
   });
-   
-  $$(".pay-membership-button")
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        async () => {
-          const membership =
-            memberships.find(
-              (item) =>
-                item.id ===
-                button.dataset
-                  .membershipId
-            );
-
-          if (!membership) {
-            return;
-          }
-
-          selectedMembership =
-            membership;
-
-          selectedCircle =
-            membership.circle;
-
-          await openPaymentPanel(
-            membership.circle,
-            membership
-          );
-        }
-      );
-    });
 
   $$(".choose-payout-button")
     .forEach((button) => {
