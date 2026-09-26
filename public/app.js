@@ -3235,6 +3235,71 @@ function cancelPayment() {
 }
 
 function setupPayment() {
+  document.addEventListener(
+    "click",
+    async (event) => {
+      const button =
+        event.target.closest(
+          ".pay-membership-button"
+        );
+
+      if (!button) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const membershipId =
+        button.dataset.membershipId;
+
+      const circleId =
+        button.dataset.circleId;
+
+      const membership =
+        currentUser?.memberships?.find(
+          (item) =>
+            String(item.id) ===
+            String(membershipId)
+        );
+
+      if (!membership) {
+        alert(
+          "Your membership could not be found. Please refresh your account and try again."
+        );
+
+        return;
+      }
+
+      const circle =
+        membership.circle ||
+        currentUser?.memberships?.find(
+          (item) =>
+            String(item.circle?.id) ===
+            String(circleId)
+        )?.circle;
+
+      if (!circle) {
+        alert(
+          "Your circle could not be found. Please refresh your account and try again."
+        );
+
+        return;
+      }
+
+      selectedMembership =
+        membership;
+
+      selectedCircle =
+        circle;
+
+      await openPaymentPanel(
+        circle,
+        membership
+      );
+    }
+  );
+
   const paypalButton =
     $("#paypalButton");
 
