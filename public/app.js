@@ -3322,20 +3322,15 @@ function setupPayment() {
       event.stopPropagation();
 
       const membershipId =
-        button.getAttribute(
-          "data-membership-id"
-        );
+        button.dataset.membershipId;
 
       const circleId =
-        button.getAttribute(
-          "data-circle-id"
-        );
+        button.dataset.circleId;
 
       if (!membershipId) {
         alert(
           "This membership could not be identified. Please refresh the page and try again."
         );
-
         return;
       }
 
@@ -3355,7 +3350,6 @@ function setupPayment() {
         alert(
           "Your membership could not be found. Please refresh your account and try again."
         );
-
         return;
       }
 
@@ -3371,7 +3365,6 @@ function setupPayment() {
         alert(
           "Your circle could not be found. Please refresh your account and try again."
         );
-
         return;
       }
 
@@ -3380,6 +3373,14 @@ function setupPayment() {
 
       selectedCircle =
         circle;
+
+      console.log(
+        "PayaCircle: Make Payment clicked",
+        {
+          membershipId,
+          circleId
+        }
+      );
 
       await openPaymentPanel(
         circle,
