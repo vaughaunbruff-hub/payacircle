@@ -817,6 +817,7 @@ function setupProfileMenu() {
   trigger?.addEventListener(
     "click",
     (event) => {
+      event.preventDefault();
       event.stopPropagation();
 
       if (!menu) return;
@@ -828,6 +829,46 @@ function setupProfileMenu() {
           : "none";
     }
   );
+
+  $("#mobileProfileButton")
+    ?.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!menu) return;
+
+        menu.style.display =
+          menu.style.display === "none" ||
+          !menu.style.display
+            ? ""
+            : "none";
+      }
+    );
+
+  menu?.querySelectorAll(
+    "[data-account-panel]"
+  ).forEach((button) => {
+    button.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const panelName =
+          button.getAttribute(
+            "data-account-panel"
+          );
+
+        if (!panelName) {
+          return;
+        }
+
+        openAccountPanel(panelName);
+      }
+    );
+  });
 
   document.addEventListener(
     "click",
@@ -835,34 +876,11 @@ function setupProfileMenu() {
       if (
         menu &&
         trigger &&
-        !menu.contains(
-          event.target
-        ) &&
-        !trigger.contains(
-          event.target
-        )
+        !menu.contains(event.target) &&
+        !trigger.contains(event.target)
       ) {
         hide(menu);
       }
-    }
-  );
-
-  $("#mobileProfileButton")
-  ?.addEventListener(
-    "click",
-    (event) => {
-      event.stopPropagation();
-
-      const menu =
-        $("#accountProfileMenu");
-
-      if (!menu) return;
-
-      menu.style.display =
-        menu.style.display === "none" ||
-        !menu.style.display
-          ? ""
-          : "none";
     }
   );
 }
