@@ -1373,7 +1373,6 @@ function renderMemberships(
     ? `
       <button
         class="primary pay-membership-button"
-        onclick="window.payPayaCircleMembership(this)"
         data-membership-id="${escapeHTML(
           membership.id
         )}"
@@ -1450,25 +1449,43 @@ function renderMemberships(
 `;
 
           container.appendChild(
-            card
-          );
+  card
+);
+
+const paymentButton =
+  card.querySelector(
+    ".pay-membership-button"
+  );
+
+paymentButton?.addEventListener(
+  "click",
+  async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    await window.payPayaCircleMembership(
+      paymentButton
+    );
+  }
+);
+
         }
       );
     }
   );
-   
-  $$(".view-circle-button")
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          openCircleDetails(
-            button.dataset.circleId
-          );
-        }
-      );
-    });
-   
+
+$$(".view-circle-button")
+  .forEach((button) => {
+    button.addEventListener(
+      "click",
+      () => {
+        openCircleDetails(
+          button.dataset.circleId
+        );
+      }
+    );
+  });
+
 $$(".invite-circle-button")
   .forEach((button) => {
     button.addEventListener(
