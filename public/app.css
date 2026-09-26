@@ -3160,6 +3160,369 @@ img{
 }
 
 /* --------------------------------
+   PAYACIRCLE CIRCLE HUB
+--------------------------------- */
+
+.circle-hub {
+  position: relative;
+  width: min(100%, 760px);
+  min-height: 620px;
+  margin: 30px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 36px;
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(255,255,255,0.10),
+      rgba(255,255,255,0.025) 42%,
+      rgba(0,0,0,0.08) 75%
+    );
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 30px 80px rgba(0,0,0,0.18),
+    inset 0 0 50px rgba(255,255,255,0.035);
+}
+
+/* Soft futuristic glow */
+
+.circle-hub-glow {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(120,180,255,0.22),
+    rgba(120,180,255,0.08) 35%,
+    transparent 70%
+  );
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+/* Orbit rings */
+
+.circle-hub-ring {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.circle-hub-ring.ring-one {
+  width: 390px;
+  height: 390px;
+}
+
+.circle-hub-ring.ring-two {
+  width: 530px;
+  height: 530px;
+  border-style: dashed;
+  opacity: 0.65;
+}
+
+/* Center */
+
+.circle-hub-core {
+  position: relative;
+  z-index: 5;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.14),
+      rgba(255,255,255,0.035)
+    );
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.22),
+    inset 0 0 30px rgba(255,255,255,0.06);
+  backdrop-filter: blur(14px);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.circle-hub-core:hover {
+  transform: scale(1.05);
+  box-shadow:
+    0 25px 70px rgba(0,0,0,0.28),
+    inset 0 0 35px rgba(255,255,255,0.09);
+}
+
+.circle-hub-core-mark {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.circle-hub-core strong {
+  font-size: 17px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.circle-hub-core small {
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+/* Circle orbit */
+
+.circle-hub-orbit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.circle-hub-node {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 132px;
+  min-height: 92px;
+  padding: 12px 10px;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--hub-angle))
+    translateY(-235px)
+    rotate(calc(var(--hub-angle) * -1));
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 22px;
+  background: rgba(255,255,255,0.055);
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.circle-hub-node:hover {
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--hub-angle))
+    translateY(-235px)
+    rotate(calc(var(--hub-angle) * -1))
+    scale(1.08);
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.28);
+}
+
+.circle-hub-node.is-full {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.circle-hub-node-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.10);
+  font-weight: 800;
+}
+
+.circle-hub-node strong {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.circle-hub-node small {
+  opacity: 0.60;
+  font-size: 11px;
+}
+
+/* Selection panel */
+
+.circle-hub-panel {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  bottom: 24px;
+  width: min(92%, 500px);
+  padding: 22px;
+  transform: translate(-50%, 30px);
+  opacity: 0;
+  visibility: hidden;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 24px;
+  background: rgba(20,20,25,0.88);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 25px 70px rgba(0,0,0,0.30);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    visibility 0.25s ease;
+}
+
+.circle-hub-panel.open {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  visibility: visible;
+}
+
+.circle-hub-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+
+.circle-hub-panel-head h3 {
+  margin: 4px 0 0;
+}
+
+#circleHubClose {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.circle-hub-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.circle-hub-detail-grid > div {
+  padding: 12px;
+  border-radius: 15px;
+  background: rgba(255,255,255,0.055);
+}
+
+.circle-hub-detail-grid span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+.circle-hub-detail-grid strong {
+  font-size: 14px;
+}
+
+.circle-hub-panel p {
+  margin: 0 0 18px;
+  opacity: 0.72;
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.circle-hub-empty {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.circle-hub-empty span {
+  opacity: 0.65;
+}
+
+/* Mobile */
+
+@media (max-width: 650px) {
+
+  .circle-hub {
+    min-height: 540px;
+    border-radius: 26px;
+  }
+
+  .circle-hub-ring.ring-one {
+    width: 280px;
+    height: 280px;
+  }
+
+  .circle-hub-ring.ring-two {
+    width: 390px;
+    height: 390px;
+  }
+
+  .circle-hub-core {
+    width: 140px;
+    height: 140px;
+  }
+
+  .circle-hub-core-mark {
+    font-size: 28px;
+  }
+
+  .circle-hub-node {
+    width: 105px;
+    min-height: 78px;
+    padding: 9px 6px;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--hub-angle))
+      translateY(-170px)
+      rotate(calc(var(--hub-angle) * -1));
+  }
+
+  .circle-hub-node:hover {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--hub-angle))
+      translateY(-170px)
+      rotate(calc(var(--hub-angle) * -1))
+      scale(1.05);
+  }
+
+  .circle-hub-node strong {
+    max-width: 90px;
+    font-size: 11px;
+  }
+
+  .circle-hub-node small {
+    font-size: 9px;
+  }
+
+  .circle-hub-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .circle-hub-panel {
+    bottom: 14px;
+    padding: 17px;
+  }
+}
+
+/* --------------------------------
    LEADOUT AI SUPPORT
 --------------------------------- */
 
