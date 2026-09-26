@@ -1354,20 +1354,18 @@ function renderMemberships(
         "PAYMENT_PENDING"
           ? `
             <button
-              class="primary pay-membership-button"
-              data-membership-id="${escapeHTML(
-                membership.id
-              )}"
-              data-circle-id="${escapeHTML(
-                circle?.id || ""
-              )}"
-              type="button"
-            >
-              Make Payment
-            </button>
-          `
-          : ""
-      }
+  class="primary pay-membership-button"
+  data-membership-id="${escapeHTML(
+    membership.id
+  )}"
+  data-circle-id="${escapeHTML(
+    circle?.id || ""
+  )}"
+  type="button"
+  onclick="window.payPayaCircleMembership(this)"
+>
+  Make Payment
+</button>
 
       ${
   circle?.isPrivate &&
@@ -1559,6 +1557,60 @@ $$(".invite-circle-button")
       );
     });
 }
+
+window.payPayaCircleMembership =
+  async function (button) {
+    try {
+      const membershipId =
+        button.dataset.membershipId;
+
+      const membership =
+        currentUser?.memberships?.find(
+          (item) =>
+            String(item.id) ===
+            String(membershipId)
+        );
+
+      if (!membership) {
+        alert(
+          "Your membership could not be found. Please refresh your account and try again."
+        );
+        return;
+      }
+
+      const circle =
+        membership.circle;
+
+      if (!circle) {
+        alert(
+          "Your circle could not be found. Please refresh your account and try again."
+        );
+        return;
+      }
+
+      selectedMembership =
+        membership;
+
+      selectedCircle =
+        circle;
+
+      await openPaymentPanel(
+        circle,
+        membership
+      );
+
+    } catch (error) {
+      console.error(
+        "Make Payment error:",
+        error
+      );
+
+      alert(
+        error.message ||
+        "Unable to open the payment panel."
+      );
+    }
+  };
 
 /* --------------------------------
    PAYOUT WEEK MODAL
