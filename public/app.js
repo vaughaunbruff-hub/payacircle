@@ -1373,6 +1373,7 @@ function renderMemberships(
     ? `
       <button
         class="primary pay-membership-button"
+        onclick="window.payPayaCircleMembership(this)"
         data-membership-id="${escapeHTML(
           membership.id
         )}"
