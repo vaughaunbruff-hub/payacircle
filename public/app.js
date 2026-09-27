@@ -1452,23 +1452,6 @@ function renderMemberships(
   card
 );
 
-const paymentButton =
-  card.querySelector(
-    ".pay-membership-button"
-  );
-
-paymentButton?.addEventListener(
-  "click",
-  async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    await window.payPayaCircleMembership(
-      paymentButton
-    );
-  }
-);
-
         }
       );
     }
@@ -1593,6 +1576,69 @@ $$(".invite-circle-button")
         }
       );
     });
+}
+
+function setupPayment() {
+  const handleMembershipPaymentClick =
+    async (event) => {
+      const target =
+        event.target;
+
+      const button =
+        target instanceof Element
+          ? target.closest(
+              ".pay-membership-button"
+            )
+          : null;
+
+      if (!button) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      console.log(
+        "PayaCircle: Make Payment clicked",
+        {
+          membershipId:
+            button.dataset.membershipId,
+
+          circleId:
+            button.dataset.circleId
+        }
+      );
+
+      await window.payPayaCircleMembership(
+        button
+      );
+    };
+
+  [
+    "#dashboardCircles",
+    "#circlesPageGrid"
+  ].forEach((selector) => {
+    $(selector)?.addEventListener(
+      "click",
+      handleMembershipPaymentClick
+    );
+  });
+
+  const paypalButton =
+    $("#paypalButton");
+
+  const cancelButton =
+    $("#cancelPayment");
+
+  paypalButton?.addEventListener(
+    "click",
+    startPayPalPayment
+  );
+
+  cancelButton?.addEventListener(
+    "click",
+    cancelPayment
+  );
 }
 
 window.payPayaCircleMembership =
