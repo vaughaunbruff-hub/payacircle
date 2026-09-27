@@ -1614,15 +1614,10 @@ function setupPayment() {
       );
     };
 
-  [
-    "#dashboardCircles",
-    "#circlesPageGrid"
-  ].forEach((selector) => {
-    $(selector)?.addEventListener(
-      "click",
-      handleMembershipPaymentClick
-    );
-  });
+  document.addEventListener(
+    "click",
+    handleMembershipPaymentClick
+  );
 
   const paypalButton =
     $("#paypalButton");
