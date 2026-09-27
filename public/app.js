@@ -1579,45 +1579,44 @@ $$(".invite-circle-button")
 }
 
 function setupPayment() {
-  const handleMembershipPaymentClick =
-    async (event) => {
-      const target =
-        event.target;
+  document.addEventListener("click", async (event) => {
+    const target = event.target;
 
-      const button =
-        target instanceof Element
-          ? target.closest(
-              ".pay-membership-button"
-            )
-          : null;
+    const button =
+      target?.closest?.(".pay-membership-button");
 
-      if (!button) {
-        return;
+    if (!button) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    console.log(
+      "PayaCircle: Make Payment clicked",
+      {
+        membershipId:
+          button.dataset.membershipId,
+
+        circleId:
+          button.dataset.circleId
       }
+    );
 
-      event.preventDefault();
-      event.stopPropagation();
-
-      console.log(
-        "PayaCircle: Make Payment clicked",
-        {
-          membershipId:
-            button.dataset.membershipId,
-
-          circleId:
-            button.dataset.circleId
-        }
+    try {
+      await window.payPayaCircleMembership(button);
+    } catch (error) {
+      console.error(
+        "PayaCircle payment button error:",
+        error
       );
 
-      await window.payPayaCircleMembership(
-        button
+      alert(
+        error?.message ||
+        "Unable to open the payment panel."
       );
-    };
-
-  document.addEventListener(
-    "click",
-    handleMembershipPaymentClick
-  );
+    }
+  });
 
   const paypalButton =
     $("#paypalButton");
