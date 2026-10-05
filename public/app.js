@@ -1580,6 +1580,44 @@ $$(".invite-circle-button")
 }
 
 function setupPayment() {
+  document.addEventListener("click", async (event) => {
+    const target = event.target;
+
+    const button =
+      target?.closest?.(".pay-membership-button");
+
+    if (!button) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    console.log(
+      "PayaCircle: Make Payment clicked",
+      {
+        membershipId:
+          button.dataset.membershipId,
+        circleId:
+          button.dataset.circleId
+      }
+    );
+
+    try {
+      await window.payPayaCircleMembership(button);
+    } catch (error) {
+      console.error(
+        "PayaCircle payment button error:",
+        error
+      );
+
+      alert(
+        error?.message ||
+        "Unable to open the payment panel."
+      );
+    }
+  });
+
   const paypalButton =
     $("#paypalButton");
 
