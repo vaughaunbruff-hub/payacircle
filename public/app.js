@@ -1380,7 +1380,6 @@ function renderMemberships(
     circle?.id || ""
   )}"
   type="button"
-  onclick="window.payPayaCircleMembership(this)"
 >
   Make Payment
 </button>
