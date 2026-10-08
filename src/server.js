@@ -360,7 +360,7 @@ Keep normal answers concise unless the user asks for more detail.
         }
       }
 
-      if (
+            if (
         !geminiResponse ||
         !geminiResponse.ok
       ) {
@@ -372,6 +372,31 @@ Keep normal answers concise unless the user asks for more detail.
         return res.status(502).json({
           error:
             "LEADOUT is temporarily busy. Please try again shortly."
+        });
+      }
+
+      const result =
+        await geminiResponse.json();
+
+      const answer =
+        result?.candidates?.[0]
+          ?.content?.parts
+          ?.map(
+            (part) =>
+              part?.text || ""
+          )
+          .join("")
+          .trim();
+
+      if (!answer) {
+        console.error(
+          "Gemini returned no answer:",
+          JSON.stringify(result)
+        );
+
+        return res.status(502).json({
+          error:
+            "LEADOUT could not generate a response."
         });
       }
 
