@@ -264,7 +264,7 @@ Keep normal answers concise unless the user asks for more detail.
         try {
           geminiResponse =
             await fetch(
-              "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+              "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent",
               {
                 method: "POST",
 
