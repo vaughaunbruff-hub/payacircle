@@ -130,11 +130,18 @@ app.post(
       const messages =
         parsed.data.messages;
 
-      const response =
-        await openai.responses.create({
-          model: "gpt-5.6-luna",
+      if (!process.env.GEMINI_API_KEY) {
+        console.error(
+          "LEADOUT error: GEMINI_API_KEY is not configured."
+        );
 
-          instructions: `
+        return res.status(500).json({
+          error:
+            "LEADOUT is temporarily unavailable. Please try again shortly."
+        });
+      }
+
+      const systemInstruction = `
 You are LEADOUT, the official AI support assistant for PayaCircle.
 
 Your personality:
@@ -192,15 +199,128 @@ You are a support assistant, not a financial advisor.
 Do not promise investment returns or guaranteed profits.
 
 Keep normal answers concise unless the user asks for more detail.
-`,
+`;
 
-          input: messages
+      const geminiContents =
+        messages
+          .filter(
+            (message) =>
+              message &&
+              message.role !== "system"
+          )
+          .map((message) => {
+            const role =
+              message.role === "assistant"
+                ? "model"
+                : "user";
+
+            let text = "";
+
+            if (
+              typeof message.content ===
+              "string"
+            ) {
+              text = message.content;
+            } else if (
+              Array.isArray(
+                message.content
+              )
+            ) {
+              text =
+                message.content
+                  .map((part) =>
+                    typeof part ===
+                    "string"
+                      ? part
+                      : part?.text || ""
+                  )
+                  .join("");
+            }
+
+            return {
+              role,
+              parts: [
+                {
+                  text
+                }
+              ]
+            };
+          })
+          .filter(
+            (message) =>
+              message.parts[0].text.trim()
+          );
+
+      const geminiResponse =
+        await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              "x-goog-api-key":
+                process.env.GEMINI_API_KEY
+            },
+
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [
+                  {
+                    text:
+                      systemInstruction
+                  }
+                ]
+              },
+
+              contents:
+                geminiContents,
+
+              generationConfig: {
+                temperature: 0.4,
+                maxOutputTokens: 500
+              }
+            })
+          }
+        );
+
+      if (!geminiResponse.ok) {
+        const errorText =
+          await geminiResponse.text();
+
+        console.error(
+          "Gemini API error:",
+          geminiResponse.status,
+          errorText
+        );
+
+        return res.status(502).json({
+          error:
+            "LEADOUT could not generate a response."
         });
+      }
+
+      const result =
+        await geminiResponse.json();
 
       const answer =
-        response.output_text?.trim();
+        result?.candidates?.[0]
+          ?.content?.parts
+          ?.map(
+            (part) =>
+              part?.text || ""
+          )
+          .join("")
+          .trim();
 
       if (!answer) {
+        console.error(
+          "Gemini returned no answer:",
+          JSON.stringify(result)
+        );
+
         return res.status(502).json({
           error:
             "LEADOUT could not generate a response."
@@ -210,6 +330,7 @@ Keep normal answers concise unless the user asks for more detail.
       return res.json({
         answer
       });
+
     } catch (error) {
       console.error(
         "LEADOUT error:",
