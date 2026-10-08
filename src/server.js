@@ -251,79 +251,127 @@ Keep normal answers concise unless the user asks for more detail.
               message.parts[0].text.trim()
           );
 
-      const geminiResponse =
-  await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
-    {
-            method: "POST",
+            let geminiResponse = null;
+      let lastGeminiError = null;
 
-            headers: {
-              "Content-Type":
-                "application/json",
+      const maxAttempts = 3;
 
-              "x-goog-api-key":
-                process.env.GEMINI_API_KEY
-            },
+      for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+      ) {
+        try {
+          geminiResponse =
+            await fetch(
+              "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+              {
+                method: "POST",
 
-            body: JSON.stringify({
-              systemInstruction: {
-                parts: [
-                  {
-                    text:
-                      systemInstruction
+                headers: {
+                  "Content-Type":
+                    "application/json",
+
+                  "x-goog-api-key":
+                    process.env.GEMINI_API_KEY
+                },
+
+                body: JSON.stringify({
+                  systemInstruction: {
+                    parts: [
+                      {
+                        text:
+                          systemInstruction
+                      }
+                    ]
+                  },
+
+                  contents:
+                    geminiContents,
+
+                  generationConfig: {
+                    temperature: 0.4,
+                    maxOutputTokens: 500
                   }
-                ]
-              },
-
-              contents:
-                geminiContents,
-
-              generationConfig: {
-                temperature: 0.4,
-                maxOutputTokens: 500
+                })
               }
-            })
+            );
+
+          if (geminiResponse.ok) {
+            break;
           }
-        );
 
-      if (!geminiResponse.ok) {
-        const errorText =
-          await geminiResponse.text();
+          const errorText =
+            await geminiResponse.text();
 
-        console.error(
-          "Gemini API error:",
-          geminiResponse.status,
-          errorText
-        );
+          lastGeminiError =
+            errorText;
 
-        return res.status(502).json({
-          error:
-            "LEADOUT could not generate a response."
-        });
+          console.error(
+            `Gemini API error (attempt ${attempt}/${maxAttempts}):`,
+            geminiResponse.status,
+            errorText
+          );
+
+          const shouldRetry =
+            geminiResponse.status === 429 ||
+            geminiResponse.status === 500 ||
+            geminiResponse.status === 502 ||
+            geminiResponse.status === 503 ||
+            geminiResponse.status === 504;
+
+          if (
+            !shouldRetry ||
+            attempt === maxAttempts
+          ) {
+            break;
+          }
+
+          await new Promise(
+            (resolve) =>
+              setTimeout(
+                resolve,
+                attempt * 1500
+              )
+          );
+
+        } catch (error) {
+          lastGeminiError =
+            error;
+
+          console.error(
+            `Gemini connection error (attempt ${attempt}/${maxAttempts}):`,
+            error
+          );
+
+          if (
+            attempt === maxAttempts
+          ) {
+            break;
+          }
+
+          await new Promise(
+            (resolve) =>
+              setTimeout(
+                resolve,
+                attempt * 1500
+              )
+          );
+        }
       }
 
-      const result =
-        await geminiResponse.json();
-
-      const answer =
-        result?.candidates?.[0]
-          ?.content?.parts
-          ?.map(
-            (part) =>
-              part?.text || ""
-          )
-          .join("")
-          .trim();
-
-      if (!answer) {
+      if (
+        !geminiResponse ||
+        !geminiResponse.ok
+      ) {
         console.error(
-          "Gemini returned no answer:",
-          JSON.stringify(result)
+          "Gemini request failed after retries:",
+          lastGeminiError
         );
 
         return res.status(502).json({
           error:
-            "LEADOUT could not generate a response."
+            "LEADOUT is temporarily busy. Please try again shortly."
         });
       }
 
